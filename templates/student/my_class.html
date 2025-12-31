@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>My Class</h2>
+
+{% if class_data %}
+    <p><strong>Class:</strong> {{ class_data.class_name }}</p>
+    <p><strong>Academic Year:</strong> {{ class_data.academic_year }}</p>
+{% else %}
+    <p>You are not assigned to any class yet.</p>
+{% endif %}
+{% endblock %}

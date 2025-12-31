@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Create User - Admin Panel{% endblock %}
+
+{% block content %}
+<h2>Create New User (Admin Only)</h2>
+
+<form method="POST">
+    <label>Name:</label><br>
+    <input type="text" name="name" required><br><br>
+
+    <label>Email:</label><br>
+    <input type="email" name="email" required><br><br>
+
+    <label>Password:</label><br>
+    <input type="password" name="password" required><br><br>
+
+    <label>Role:</label><br>
+    <select name="role" required>
+        <option value="admin">Admin</option>
+        <option value="teacher">Teacher</option>
+        <option value="student">Student</option>
+    </select><br><br>
+
+    <button type="submit">Create User</button>
+</form>
+
+<br>
+<a href="/admin/dashboard">Back to Dashboard</a>
+{% endblock %}

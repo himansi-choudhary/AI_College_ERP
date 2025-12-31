@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Class: {{ class_data.class_name }}</h2>
+<p>Academic Year: {{ class_data.academic_year }}</p>
+
+<h3>Subjects</h3>
+
+{% if subjects %}
+<ul>
+  {% for s in subjects %}
+    <li>{{ s.subject_name }}</li>
+  {% endfor %}
+</ul>
+{% else %}
+<p>No subjects assigned.</p>
+{% endif %}
+
+<a href="/admin/subjects/add">Add Subject</a>
+{% endblock %}

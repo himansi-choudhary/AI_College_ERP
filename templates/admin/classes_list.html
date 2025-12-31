@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Classes</h2>
+
+<a href="/admin/classes/add">Add New Class</a>
+
+<table border="1" cellpadding="5">
+<tr>
+    <th>Class Name</th>
+    <th>Academic Year</th>
+</tr>
+
+{% for c in classes %}
+<tr>
+    <td>{{ c.class_name }}</td>
+    <td>{{ c.academic_year }}</td>
+    <td><a href="/admin/classes/{{ c.id }}/subjects">View Subjects</a></td>
+</tr>
+{% endfor %}
+</table>
+{% endblock %}
+

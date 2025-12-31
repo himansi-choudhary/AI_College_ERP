@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Assign Student → Class</h2>
+
+<form method="POST">
+    <label>Student:</label>
+    <select name="student_id" required>
+        {% for s in students %}
+            <option value="{{ s.id }}">{{ s.name }}</option>
+        {% endfor %}
+    </select><br><br>
+
+    <label>Class:</label>
+    <select name="class_id" required>
+        {% for c in classes %}
+            <option value="{{ c.id }}">{{ c.class_name }}</option>
+        {% endfor %}
+    </select><br><br>
+
+    <button type="submit">Assign</button>
+</form>
+{% endblock %}

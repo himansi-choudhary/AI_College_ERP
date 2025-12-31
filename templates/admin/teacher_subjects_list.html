@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Teacher ↔ Class ↔ Subject Mappings</h2>
+
+{% if mappings %}
+<table border="1" cellpadding="8" cellspacing="0">
+    <tr>
+        <th>ID</th>
+        <th>Teacher</th>
+        <th>Class</th>
+        <th>Subject</th>
+    </tr>
+    {% for m in mappings %}
+    <tr>
+        <td>{{ m.id }}</td>
+        <td>{{ m.teacher_name }}</td>
+        <td>{{ m.class_name }}</td>
+        <td>{{ m.subject_name }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p>No mappings found.</p>
+{% endif %}
+
+<a href="/admin/teacher-subjects/add">Assign New</a>
+{% endblock %}
