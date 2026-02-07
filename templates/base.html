@@ -22,9 +22,11 @@
         <a href="/admin/assign-student">Assign Student</a>
 
 
+
       {% elif session.get('role') == 'teacher' %}
         <a href="/teacher/dashboard">Dashboard</a>
         <a href="/teacher/my-students">My Students</a>
+        <a href="/teacher/attendance">Mark Attendance</a>
 
       {% elif session.get('role') == 'student' %}
         <a href="/student/dashboard">Dashboard</a>

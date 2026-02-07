@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<h2>Mark Attendance</h2>
+
+<p>
+  <strong>Class:</strong> {{ subject.class_name }} <br>
+  <strong>Subject:</strong> {{ subject.subject_name }} <br>
+  <strong>Date:</strong> {{ today }}
+</p>
+
+<form method="POST">
+<table border="1" cellpadding="8">
+    <tr>
+        <th>Student Name</th>
+        <th>Status</th>
+    </tr>
+
+    {% for s in students %}
+    <tr>
+        <td>{{ s.name }}</td>
+        <td>
+            <select name="status_{{ s.id }}">
+                <option value="Present">Present</option>
+                <option value="Absent">Absent</option>
+            </select>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+<br>
+<button type="submit">Save Attendance</button>
+</form>
+
+{% endblock %}

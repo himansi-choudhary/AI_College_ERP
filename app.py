@@ -1,4 +1,5 @@
 import os
+from datetime import date
 from flask import Flask, render_template, request, redirect, session, flash
 import mysql.connector
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -455,6 +456,77 @@ def teacher_my_students():
     conn.close()
 
     return render_template('teacher/my_students.html', students=students)
+
+# ---------------- TEACHER: MARK ATTENDANCE ----------------
+@app.route('/teacher/attendance', methods=['GET', 'POST'])
+def mark_attendance():
+    guard = login_required('teacher')
+    if guard:
+        return guard
+
+    teacher_id = session.get('user_id')
+    today = date.today()
+
+    conn = get_db_connection()
+
+    # Use a dictionary cursor for fetching mapping
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT ts.subject_id, ts.class_id, s.subject_name, c.class_name
+        FROM teacher_subjects ts
+        JOIN subjects s ON ts.subject_id = s.id
+        JOIN classes c ON ts.class_id = c.id
+        WHERE ts.teacher_id = %s
+    """, (teacher_id,))
+    mapping = cursor.fetchall()  
+    cursor.close()  
+
+    if not mapping:
+        conn.close()
+        flash("No subject assigned", "error")
+        return redirect('/teacher/dashboard')
+    
+    mapping = mapping[0]
+
+    # Use a **new cursor** for fetching students
+    student_cursor = conn.cursor(dictionary=True)
+    student_cursor.execute("""
+        SELECT u.id, u.name
+        FROM student_classes sc
+        JOIN users u ON sc.student_id = u.id
+        WHERE sc.class_id = %s
+    """, (mapping['class_id'],))
+    students = student_cursor.fetchall()
+    student_cursor.close()
+
+    if request.method == 'POST':
+        # Separate cursor for inserting attendance
+        insert_cursor = conn.cursor()
+        for student in students:
+            status = request.form.get(f"status_{student['id']}")
+            if status not in ['Present', 'Absent']:
+                continue
+            insert_cursor.execute("""
+                INSERT INTO attendance (student_id, subject_id, date, status)
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE status=%s
+            """, (student['id'], mapping['subject_id'], today, status, status))
+        
+        conn.commit()
+        insert_cursor.close()
+        conn.close()
+        flash("Attendance saved successfully", "success")
+        return redirect('/teacher/attendance')
+
+    # GET request: render attendance form
+    conn.close()
+    return render_template(
+        'teacher/mark_attendance.html',
+        students=students,
+        subject=mapping,
+        today=today
+    )
+
 
 # ---------------- Logout Route ----------------
 @app.route('/logout')
