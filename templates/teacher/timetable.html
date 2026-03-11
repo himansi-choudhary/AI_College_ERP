@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h2>My Timetable</h2>
+
+<table border="1">
+<tr>
+<th>Class</th>
+<th>Subject</th>
+<th>Day</th>
+<th>Start Time</th>
+<th>End Time</th>
+</tr>
+
+{% for row in schedule %}
+<tr>
+<td>{{ row.class_name }}</td>
+<td>{{ row.subject_name }}</td>
+<td>{{ row.day }}</td>
+<td>{{ row.start_time }}</td>
+<td>{{ row.end_time }}</td>
+</tr>
+{% endfor %}
+
+</table>
+
+{% endblock %}

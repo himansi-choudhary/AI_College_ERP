@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h2>Create Assignment</h2>
+
+<form method="POST">
+
+Title<br>
+<input type="text" name="title" required><br><br>
+
+Description<br>
+<textarea name="description"></textarea><br><br>
+
+Subject<br>
+<select name="subject_id">
+{% for s in subjects %}
+<option value="{{ s.id }}">{{ s.subject_name }}</option>
+{% endfor %}
+</select><br><br>
+
+Due Date<br>
+<input type="date" name="due_date"><br><br>
+
+<button type="submit">Create Assignment</button>
+
+</form>
+
+{% endblock %}

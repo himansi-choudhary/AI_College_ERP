@@ -2,59 +2,75 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}AI College ERP{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>{% block title %}AI College ERP{% endblock %}</title>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 
 <body>
-  <!-- Navbar -->
-  <nav>
-    <div class="nav-left">
-      {% if session.get('role') == 'admin' %}
-        <a href="/admin/dashboard">Dashboard</a>
-        <a href="/admin/create-user">Create User</a>
-        <a href="/admin/users">View Users</a>
-        <a href="/admin/classes">Classes</a>
-        <a href="/admin/subjects">Subjects</a>
-        <a href="/admin/teacher-subjects">Teacher ↔ Subject Mapping</a>
-        <a href="/admin/assign-student">Assign Student</a>
+
+<nav>
+<div class="nav-left">
+
+<a href="/">Home</a>
+
+{% if session.get('role') == 'admin' %}
+<a href="/admin/dashboard">Dashboard</a>
+<a href="/admin/create-user">Create User</a>
+<a href="/admin/users">Users</a>
+<a href="/admin/classes">Classes</a>
+<a href="/admin/subjects">Subjects</a>
+<a href="/admin/teacher-subjects">Teacher ↔ Subject Mapping</a>
+ <a href="/admin/assign-student">Assign Student</a>
+<a href="/admin/analytics">Analytics</a>
 
 
+{% elif session.get('role') == 'teacher' %}
+<a href="/teacher/dashboard">Dashboard</a>
+<a href="/teacher/my-students">My Students</a>
+<a href="/teacher/timetable">View Timetable</a>
+<a href="/teacher/attendance">Mark Attendance</a>
+<a href="/teacher/create_test">Create Test</a>
+<a href="/teacher/materials">Upload Materials</a>
+<a href="/teacher/assignments">Assignments</a>
 
-      {% elif session.get('role') == 'teacher' %}
-        <a href="/teacher/dashboard">Dashboard</a>
-        <a href="/teacher/my-students">My Students</a>
-        <a href="/teacher/attendance">Mark Attendance</a>
+{% elif session.get('role') == 'student' %}
+<a href="/student/dashboard">Dashboard</a>
+<a href="/student/my-class">My Class</a>
+<a href="/student/tests">Tests</a>
+<a href="/student/results">Results</a>
 
-      {% elif session.get('role') == 'student' %}
-        <a href="/student/dashboard">Dashboard</a>
-        <a href="/student/my-class">My Class</a>
-      {% endif %}
-    </div>
+{% endif %}
 
-    <div class="nav-right">
-      {% if session.get('user_id') %}
-        <a href="/logout">Logout</a>
-      {% endif %}
-    </div>
-  </nav>
+</div>
 
-  <!-- Main Container -->
-  <div class="container">
-    <!-- Flash Messages -->
-    {% with messages = get_flashed_messages(with_categories=True) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="flash {{ category }}">{{ message }}</div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
+<div class="nav-right">
+{% if session.get('user_id') %}
+<a href="/logout">Logout</a>
+{% else %}
+<a href="/login">Login</a>
+{% endif %}
+</div>
 
-    <!-- Page Content -->
-    {% block content %}{% endblock %}
-  </div>
+</nav>
+
+<div class="container">
+
+{% with messages = get_flashed_messages(with_categories=True) %}
+{% if messages %}
+{% for category, message in messages %}
+<div class="flash {{ category }}">{{ message }}</div>
+{% endfor %}
+{% endif %}
+{% endwith %}
+
+{% block content %}{% endblock %}
+
+</div>
+
 </body>
 
 </html>

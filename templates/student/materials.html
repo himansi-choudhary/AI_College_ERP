@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h2>Study Materials</h2>
+
+<table border="1">
+
+<tr>
+<th>Subject</th>
+<th>Title</th>
+<th>Download</th>
+</tr>
+
+{% for m in materials %}
+
+<tr>
+
+<td>{{ m.subject_name }}</td>
+<td>{{ m.title }}</td>
+
+<td>
+<a href="/static/uploads/{{ m.file_name }}" download>
+Download
+</a>
+</td>
+
+</tr>
+
+{% endfor %}
+
+</table>
+
+{% endblock %}

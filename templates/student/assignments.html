@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h2>Assignments</h2>
+
+<table border="1">
+
+<tr>
+<th>Subject</th>
+<th>Title</th>
+<th>Description</th>
+<th>Due Date</th>
+<th>Submit</th>
+</tr>
+
+{% for a in assignments %}
+
+<tr>
+
+<td>{{ a.subject_name }}</td>
+<td>{{ a.title }}</td>
+<td>{{ a.description }}</td>
+<td>{{ a.due_date }}</td>
+
+<td>
+<a href="/student/submit/{{ a.id }}">Submit</a>
+</td>
+
+</tr>
+
+{% endfor %}
+
+</table>
+
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h2>System Analytics</h2>
+
+<ul>
+<li>Total Students: {{ students }}</li>
+<li>Total Teachers: {{ teachers }}</li>
+<li>Total Tests: {{ tests }}</li>
+</ul>
+
+<canvas id="myChart" width="400" height="200"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+
+var ctx = document.getElementById('myChart').getContext('2d');
+
+var chart = new Chart(ctx, {
+
+type: 'bar',
+
+data: {
+
+labels: ['Students','Teachers','Tests'],
+
+datasets: [{
+label: 'System Data',
+data: [{{students}},{{teachers}},{{tests}}],
+borderWidth:1
+}]
+
+}
+
+});
+
+</script>
+
+{% endblock %}

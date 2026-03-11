@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h2>Add Question</h2>
+
+<form method="POST">
+
+Question<br>
+<input type="text" name="question"><br><br>
+
+Option A<br>
+<input type="text" name="a"><br>
+
+Option B<br>
+<input type="text" name="b"><br>
+
+Option C<br>
+<input type="text" name="c"><br>
+
+Option D<br>
+<input type="text" name="d"><br><br>
+
+Correct Option<br>
+
+<select name="correct">
+
+<option value="A">A</option>
+<option value="B">B</option>
+<option value="C">C</option>
+<option value="D">D</option>
+
+</select><br><br>
+
+<button type="submit">Add Question</button>
+
+</form>
+
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h2>Upload Study Material</h2>
+
+<form method="POST" enctype="multipart/form-data">
+
+Title<br>
+<input type="text" name="title"><br><br>
+
+Subject<br>
+<select name="subject_id">
+
+{% for s in subjects %}
+<option value="{{ s.id }}">{{ s.subject_name }}</option>
+{% endfor %}
+
+</select><br><br>
+
+Upload File<br>
+<input type="file" name="file"><br><br>
+
+<button type="submit">Upload</button>
+
+</form>
+
+{% endblock %}

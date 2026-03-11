@@ -1,14 +1,19 @@
+
 import os
 from datetime import date
 from flask import Flask, render_template, request, redirect, session, flash
 import mysql.connector
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
+UPLOAD_FOLDER = os.path.join('static', 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # ---------------- Database Connection ----------------
 def get_db_connection():
@@ -76,6 +81,7 @@ def admin_dashboard():
         return guard
     return render_template('admin/admin_dashboard.html')
 
+
 @app.route('/teacher/dashboard')
 def teacher_dashboard():
     guard = login_required('teacher')
@@ -83,12 +89,488 @@ def teacher_dashboard():
         return guard
     return render_template('teacher/teacher_dashboard.html')
 
+
+# ---------------- STUDENT DASHBOARD ----------------
 @app.route('/student/dashboard')
 def student_dashboard():
     guard = login_required('student')
     if guard:
         return guard
     return render_template('student/student_dashboard.html')
+
+
+# ---------------- STUDENT TIMETABLE ----------------
+@app.route('/student/timetable')
+def student_timetable():
+    guard = login_required('student')
+    if guard:
+        return guard
+
+    student_id = session.get('user_id')
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT s.subject_name, t.day, t.start_time, t.end_time
+        FROM student_classes sc
+        JOIN timetable t ON sc.class_id = t.class_id
+        JOIN subjects s ON t.subject_id = s.id
+        WHERE sc.student_id = %s
+        ORDER BY FIELD(t.day,'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday')
+    """, (student_id,))
+
+    schedule = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return render_template('student/timetable.html', schedule=schedule)
+
+# ---------------- STUDENT ASSIGNMENTS ----------------
+@app.route('/student/assignments')
+def student_assignments():
+
+    guard = login_required('student')
+    if guard:
+        return guard
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT a.id, a.title, a.description, a.due_date,
+        s.subject_name
+        FROM assignments a
+        JOIN subjects s ON a.subject_id = s.id
+    """)
+
+    assignments = cursor.fetchall()
+
+    conn.close()
+
+    return render_template(
+        'student/assignments.html',
+        assignments=assignments
+    )
+# ---------------- STUDENT MATERIALS ----------------
+@app.route('/student/materials')
+def student_materials():
+
+    guard = login_required('student')
+    if guard:
+        return guard
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+    SELECT m.title, m.file_name, s.subject_name
+    FROM study_materials m
+    JOIN subjects s ON m.subject_id = s.id
+    """)
+
+    materials = cursor.fetchall()
+
+    conn.close()
+
+    return render_template(
+        'student/materials.html',
+        materials=materials
+    )
+# ---------------- STUDENT TESTS ----------------
+@app.route('/student/tests')
+def student_tests():
+
+    guard = login_required('student')
+    if guard:
+        return guard
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+    SELECT t.id, t.title, s.subject_name
+    FROM tests t
+    JOIN subjects s ON t.subject_id = s.id
+    """)
+    tests = cursor.fetchall()
+
+    conn.close()
+
+    return render_template(
+        'student/tests.html',
+        tests=tests
+    )
+# ---------------- STUDENT ATTEMPT TEST ----------------
+@app.route('/student/attempt_test/<int:test_id>', methods=['GET','POST'])
+def attempt_test(test_id):
+
+    guard = login_required('student')
+    if guard:
+        return guard
+
+    student_id = session.get('user_id')
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+    SELECT * FROM questions
+    WHERE test_id=%s
+    """,(test_id,))
+
+    questions = cursor.fetchall()
+
+    if request.method == 'POST':
+
+        score = 0
+
+        for q in questions:
+
+            selected = request.form.get(str(q['id']))
+
+            if selected == q['correct_option']:
+                score += 1
+
+        cursor.execute("""
+        INSERT INTO results (student_id,test_id,score)
+        VALUES (%s,%s,%s)
+        """,(student_id,test_id,score))
+
+        conn.commit()
+
+        return f"Your Score: {score}"
+
+    conn.close()
+
+    return render_template(
+        'student/attempt_test.html',
+        questions=questions
+    )
+
+# ---------------- STUDENT RESULTS ----------------
+@app.route('/student/results')
+def student_results():
+
+    guard = login_required('student')
+    if guard:
+        return guard
+
+    student_id = session.get('user_id')
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+    SELECT t.title, r.score, s.subject_name
+    FROM results r
+    JOIN tests t ON r.test_id = t.id
+    JOIN subjects s ON t.subject_id = s.id
+    WHERE r.student_id=%s
+    """,(student_id,))
+
+    results = cursor.fetchall()
+
+    conn.close()
+
+    return render_template(
+        'student/results.html',
+        results=results
+    )
+# ---------------- AI RECOMMENDATION ----------------
+@app.route('/student/ai_recommendation/<int:test_id>')
+def ai_recommendation(test_id):
+
+    guard = login_required('student')
+    if guard:
+        return guard
+
+    student_id = session.get('user_id')
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+    SELECT score
+    FROM results
+    WHERE student_id=%s AND test_id=%s
+    """,(student_id,test_id))
+
+    result = cursor.fetchone()
+
+    conn.close()
+
+    if result and result['score'] < 3:
+        message = "AI Suggestion: Revise this subject and practice more MCQ tests."
+    else:
+        message = "AI Suggestion: Good performance. Continue practicing."
+
+    return message
+
+
+
+# ---------------- STUDENT SUBMIT ASSIGNMENT ----------------
+@app.route('/student/submit/<int:assignment_id>', methods=['GET','POST'])
+def submit_assignment(assignment_id):
+
+    guard = login_required('student')
+    if guard:
+        return guard
+
+    student_id = session.get('user_id')
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if request.method == 'POST':
+
+        submission_text = request.form['submission_text']
+
+        cursor.execute("""
+        INSERT INTO submissions
+        (assignment_id, student_id, submission_text)
+        VALUES (%s,%s,%s)
+        """,(assignment_id, student_id, submission_text))
+
+        conn.commit()
+
+        return redirect('/student/assignments')
+
+    conn.close()
+
+    return render_template('student/submit_assignment.html')
+
+# ---------- TEACHER TIMETABLE ----------
+@app.route('/teacher/timetable')
+def teacher_timetable():
+    guard = login_required('teacher')
+    if guard:
+        return guard
+
+    teacher_id = session.get('user_id')
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT c.class_name, s.subject_name, t.day, t.start_time, t.end_time
+        FROM timetable t
+        JOIN classes c ON t.class_id = c.id
+        JOIN subjects s ON t.subject_id = s.id
+        WHERE t.teacher_id = %s
+        ORDER BY FIELD(t.day,'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday')
+    """, (teacher_id,))
+
+    schedule = cursor.fetchall()
+    conn.close()
+    return render_template('teacher/timetable.html', schedule=schedule)
+
+
+# ---------------- TEACHER ASSIGNMENTS ----------------
+@app.route('/teacher/assignments', methods=['GET', 'POST'])
+def teacher_assignments():
+    guard = login_required('teacher')
+    if guard:
+        return guard
+
+    teacher_id = session.get('user_id')
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    if request.method == 'POST':
+        title = request.form['title']
+        description = request.form['description']
+        subject_id = request.form['subject_id']
+        due_date = request.form['due_date']
+
+        cursor.execute("""
+            INSERT INTO assignments (title, description, subject_id, teacher_id, due_date)
+            VALUES (%s,%s,%s,%s,%s)
+        """, (title, description, subject_id, teacher_id, due_date))
+
+        conn.commit()
+
+    cursor.execute("SELECT id, subject_name FROM subjects")
+    subjects = cursor.fetchall()
+
+    conn.close()
+
+    return render_template(
+        'teacher/assignments.html',
+        subjects=subjects
+    )
+# ---------------- TEACHER CREATE TEST ----------------
+@app.route('/teacher/create_test', methods=['GET','POST'])
+def create_test():
+
+    guard = login_required('teacher')
+    if guard:
+        return guard
+
+    teacher_id = session.get('user_id')
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    if request.method == 'POST':
+
+        title = request.form['title']
+        subject_id = request.form['subject_id']
+
+        cursor.execute("""
+        INSERT INTO tests (title, subject_id, teacher_id)
+        VALUES (%s,%s,%s)
+        """,(title,subject_id,teacher_id))
+
+        conn.commit()
+
+    cursor.execute("SELECT id, subject_name FROM subjects")
+    subjects = cursor.fetchall()
+
+    conn.close()
+
+    return render_template(
+        'teacher/create_test.html',
+        subjects=subjects
+    )
+
+# ---------------- TEACHER ADD QUESTIONS ----------------
+@app.route('/teacher/add_questions/<int:test_id>', methods=['GET','POST'])
+def add_questions(test_id):
+
+    guard = login_required('teacher')
+    if guard:
+        return guard
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    if request.method == 'POST':
+
+        q = request.form['question']
+        a = request.form['a']
+        b = request.form['b']
+        c = request.form['c']
+        d = request.form['d']
+        correct = request.form['correct']
+        cursor.execute("""
+        INSERT INTO questions
+        (test_id, question_text, option_a, option_b, option_c, option_d, correct_option)
+        VALUES (%s,%s,%s,%s,%s,%s,%s)
+        """,(test_id,q,a,b,c,d,correct))
+
+        conn.commit()
+
+    conn.close()
+
+    return render_template(
+        'teacher/add_questions.html',
+        test_id=test_id
+    )
+
+# ---------------- TEACHER VIEW TEST RESULTS ----------------
+@app.route('/teacher/results/<int:test_id>')
+def teacher_results(test_id):
+
+    guard = login_required('teacher')
+    if guard:
+        return guard
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+    SELECT u.name, r.score
+    FROM results r
+    JOIN users u ON r.student_id = u.id
+    WHERE r.test_id=%s
+    """,(test_id,))
+
+    results = cursor.fetchall()
+
+    conn.close()
+
+    return render_template(
+        'teacher/results.html',
+        results=results
+    )
+
+# ---------------- TEACHER EXPORT RESULTS TO CSV ----------------
+import csv
+from flask import Response
+
+@app.route('/teacher/export_results/<int:test_id>')
+def export_results(test_id):
+    guard = login_required('teacher')
+    if guard:
+        return guard
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+    SELECT u.name AS student_name, r.score
+    FROM results r
+    JOIN users u ON r.student_id = u.id
+    WHERE r.test_id=%s
+    """, (test_id,))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    def generate():
+        yield "Student,Score\n"
+        for row in rows:
+            yield f"{row['student_name']},{row['score']}\n"
+
+    return Response(
+        generate(),
+        mimetype='text/csv',
+        headers={"Content-Disposition": "attachment;filename=results.csv"}
+    )
+
+# ---------------- TEACHER STUDY MATERIALS ----------------
+@app.route('/teacher/materials', methods=['GET','POST'])
+def teacher_materials():
+
+    guard = login_required('teacher')
+    if guard:
+        return guard
+
+    teacher_id = session.get('user_id')
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    if request.method == 'POST':
+
+        title = request.form['title']
+        subject_id = request.form['subject_id']
+        file = request.files['file']
+
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+        file.save(filepath)
+
+        cursor.execute("""
+        INSERT INTO study_materials
+        (title, file_name, subject_id, teacher_id)
+        VALUES (%s,%s,%s,%s)
+        """,(title, filename, subject_id, teacher_id))
+
+        conn.commit()
+
+    cursor.execute("SELECT id, subject_name FROM subjects")
+    subjects = cursor.fetchall()
+
+    conn.close()
+
+    return render_template(
+        'teacher/materials.html',
+        subjects=subjects
+    )
 
 # ---------------- ADMIN: CREATE USER ----------------
 @app.route('/admin/create-user', methods=['GET', 'POST'])
@@ -100,6 +582,7 @@ def create_user():
     if request.method == 'POST':
         name = request.form['name']
         email = request.form['email']
+
         password = request.form['password']
         role = request.form['role']
 
@@ -122,6 +605,36 @@ def create_user():
         return redirect('/admin/create-user')
 
     return render_template('admin/create_user.html')
+
+# ---------------- ADMIN ANALYTICS ----------------
+@app.route('/admin/analytics')
+def admin_analytics():
+
+
+    guard = login_required('admin')
+    if guard:
+        return guard
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("SELECT COUNT(*) total FROM users WHERE role='student'")
+    students = cursor.fetchone()['total']
+
+    cursor.execute("SELECT COUNT(*) total FROM users WHERE role='teacher'")
+    teachers = cursor.fetchone()['total']
+
+    cursor.execute("SELECT COUNT(*) total FROM tests")
+    tests = cursor.fetchone()['total']
+
+    conn.close()
+
+    return render_template(
+        'admin/analytics.html',
+        students=students,
+        teachers=teachers,
+        tests=tests
+    )
 
 # ---------------- ADMIN: VIEW USERS LIST ----------------
 @app.route('/admin/users')
@@ -168,6 +681,33 @@ def toggle_user(user_id):
 
     flash("User status updated successfully", "success")
     return redirect('/admin/users')
+
+    # ---------------- ADMIN: SEARCH STUDENTS ----------------
+@app.route('/admin/search_students')
+def search_students():
+
+    guard = login_required('admin')
+    if guard:
+        return guard
+
+    keyword = request.args.get('q')
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+    SELECT * FROM users
+    WHERE role='student'
+    AND name LIKE %s
+    """,('%'+keyword+'%',))  # note: your table column is probably 'name' not 'username'
+
+    students = cursor.fetchall()
+    conn.close()
+
+    return render_template(
+        'admin/search_students.html',
+        students=students
+    )
+
 
 # ---------------- ADMIN: VIEW CLASSES ----------------
 @app.route('/admin/classes')
