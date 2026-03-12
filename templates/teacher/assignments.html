@@ -26,4 +26,30 @@ Due Date<br>
 
 </form>
 
+<hr>
+
+<h2>My Assignments</h2>
+
+<table border="1">
+
+<tr>
+<th>Subject</th>
+<th>Title</th>
+<th>Description</th>
+<th>Due Date</th>
+</tr>
+
+{% for a in assignments %}
+
+<tr>
+<td>{{ a.subject_name }}</td>
+<td>{{ a.title }}</td>
+<td>{{ a.description }}</td>
+<td>{{ a.due_date }}</td>
+</tr>
+
+{% endfor %}
+
+</table>
+
 {% endblock %}

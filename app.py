@@ -1,19 +1,55 @@
-
 import os
 from datetime import date
+import time
 from flask import Flask, render_template, request, redirect, session, flash
 import mysql.connector
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
+from functools import wraps
 
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
+
 UPLOAD_FOLDER = os.path.join('static', 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  
+
+ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'png', 'jpg', 'jpeg'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def login_required(role=None):
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            if 'user_id' not in session:
+                return redirect('/login')
+            if role and session.get('role') != role:
+                return redirect('/login')
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
+# ---------------- FILE SIZE ERROR HANDLER ----------------
+@app.errorhandler(413)
+def file_too_large(e):
+    flash("File too large! Maximum size allowed is 50MB.", "error")
+    return redirect(request.url)
+
+# ---------------- ERROR PAGES ----------------
+@app.errorhandler(404)
+def not_found(e):
+    return render_template("errors/404.html"), 404
+
+
+@app.errorhandler(500)
+def server_error(e):
+    return render_template("errors/500.html"), 500
 
 # ---------------- Database Connection ----------------
 def get_db_connection():
@@ -23,13 +59,6 @@ def get_db_connection():
         password=os.getenv("DB_PASSWORD"),
         database=os.getenv("DB_NAME")
     )
-
-# ---------------- Session Guard Helper ----------------
-def login_required(role=None):
-    if 'user_id' not in session:
-        return redirect('/login')
-    if role and session.get('role') != role:
-        return redirect('/login')
 
 # ---------------- Home Route ----------------
 @app.route('/')
@@ -75,37 +104,24 @@ def login():
 
 # ---------------- Dashboard Routes ----------------
 @app.route('/admin/dashboard')
+@login_required('admin')
 def admin_dashboard():
-    guard = login_required('admin')
-    if guard:
-        return guard
     return render_template('admin/admin_dashboard.html')
 
-
 @app.route('/teacher/dashboard')
+@login_required('teacher')
 def teacher_dashboard():
-    guard = login_required('teacher')
-    if guard:
-        return guard
     return render_template('teacher/teacher_dashboard.html')
 
-
-# ---------------- STUDENT DASHBOARD ----------------
 @app.route('/student/dashboard')
+@login_required('student')
 def student_dashboard():
-    guard = login_required('student')
-    if guard:
-        return guard
     return render_template('student/student_dashboard.html')
-
 
 # ---------------- STUDENT TIMETABLE ----------------
 @app.route('/student/timetable')
+@login_required('student')
 def student_timetable():
-    guard = login_required('student')
-    if guard:
-        return guard
-
     student_id = session.get('user_id')
 
     conn = get_db_connection()
@@ -129,37 +145,37 @@ def student_timetable():
 
 # ---------------- STUDENT ASSIGNMENTS ----------------
 @app.route('/student/assignments')
+@login_required('student')
 def student_assignments():
-
-    guard = login_required('student')
-    if guard:
-        return guard
+    student_id = session.get('user_id')
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
     cursor.execute("""
         SELECT a.id, a.title, a.description, a.due_date,
-        s.subject_name
+               s.subject_name
         FROM assignments a
         JOIN subjects s ON a.subject_id = s.id
-    """)
+        JOIN student_classes sc ON sc.class_id = s.class_id
+        WHERE sc.student_id = %s
+    """, (student_id,))
 
     assignments = cursor.fetchall()
 
+    cursor.close()
     conn.close()
 
     return render_template(
         'student/assignments.html',
         assignments=assignments
     )
+
+
 # ---------------- STUDENT MATERIALS ----------------
 @app.route('/student/materials')
+@login_required('student')
 def student_materials():
-
-    guard = login_required('student')
-    if guard:
-        return guard
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -172,6 +188,7 @@ def student_materials():
 
     materials = cursor.fetchall()
 
+    cursor.close()
     conn.close()
 
     return render_template(
@@ -180,35 +197,8 @@ def student_materials():
     )
 # ---------------- STUDENT TESTS ----------------
 @app.route('/student/tests')
+@login_required('student')
 def student_tests():
-
-    guard = login_required('student')
-    if guard:
-        return guard
-
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-
-    cursor.execute("""
-    SELECT t.id, t.title, s.subject_name
-    FROM tests t
-    JOIN subjects s ON t.subject_id = s.id
-    """)
-    tests = cursor.fetchall()
-
-    conn.close()
-
-    return render_template(
-        'student/tests.html',
-        tests=tests
-    )
-# ---------------- STUDENT ATTEMPT TEST ----------------
-@app.route('/student/attempt_test/<int:test_id>', methods=['GET','POST'])
-def attempt_test(test_id):
-
-    guard = login_required('student')
-    if guard:
-        return guard
 
     student_id = session.get('user_id')
 
@@ -216,32 +206,75 @@ def attempt_test(test_id):
     cursor = conn.cursor(dictionary=True)
 
     cursor.execute("""
+        SELECT t.id, t.title, s.subject_name
+        FROM tests t
+        JOIN subjects s ON t.subject_id = s.id
+        JOIN student_classes sc ON sc.class_id = s.class_id
+        WHERE sc.student_id = %s
+    """, (student_id,))
+
+    tests = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return render_template(
+        'student/tests.html',
+        tests=tests
+    )
+
+
+# ---------------- STUDENT ATTEMPT TEST ----------------
+@app.route('/student/attempt_test/<int:test_id>', methods=['GET','POST'])
+@login_required('student')
+def attempt_test(test_id):
+
+    student_id = session.get('user_id')
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT id FROM results
+        WHERE student_id=%s AND test_id=%s
+    """, (student_id, test_id))
+    existing = cursor.fetchone()
+
+    if existing:
+        cursor.close()
+        conn.close()
+        flash("You have already attempted this test!", "error")
+        return redirect('/student/tests')
+
+    cursor.execute("""
     SELECT * FROM questions
     WHERE test_id=%s
     """,(test_id,))
-
     questions = cursor.fetchall()
 
     if request.method == 'POST':
-
         score = 0
-
         for q in questions:
-
             selected = request.form.get(str(q['id']))
-
             if selected == q['correct_option']:
                 score += 1
 
-        cursor.execute("""
-        INSERT INTO results (student_id,test_id,score)
-        VALUES (%s,%s,%s)
-        """,(student_id,test_id,score))
-
-        conn.commit()
-
-        return f"Your Score: {score}"
-
+        try:
+            cursor.execute("""
+                INSERT INTO results (student_id, test_id, score)
+                VALUES (%s, %s, %s)
+            """, (student_id, test_id, score))
+            conn.commit()
+            flash(f"Test submitted successfully! Your Score: {score}", "success")
+        except mysql.connector.errors.IntegrityError:
+            flash("You have already attempted this test!", "error")
+        finally:
+            cursor.close()
+            conn.close()
+        
+        return redirect('/student/results')
+    
+    cursor.close()
     conn.close()
 
     return render_template(
@@ -251,11 +284,8 @@ def attempt_test(test_id):
 
 # ---------------- STUDENT RESULTS ----------------
 @app.route('/student/results')
+@login_required('student')
 def student_results():
-
-    guard = login_required('student')
-    if guard:
-        return guard
 
     student_id = session.get('user_id')
 
@@ -263,7 +293,7 @@ def student_results():
     cursor = conn.cursor(dictionary=True)
 
     cursor.execute("""
-    SELECT t.title, r.score, s.subject_name
+    SELECT t.id AS test_id, t.title, r.score, s.subject_name
     FROM results r
     JOIN tests t ON r.test_id = t.id
     JOIN subjects s ON t.subject_id = s.id
@@ -271,21 +301,19 @@ def student_results():
     """,(student_id,))
 
     results = cursor.fetchall()
-
+    
+    cursor.close()
     conn.close()
 
     return render_template(
         'student/results.html',
         results=results
     )
+
 # ---------------- AI RECOMMENDATION ----------------
 @app.route('/student/ai_recommendation/<int:test_id>')
+@login_required('student')
 def ai_recommendation(test_id):
-
-    guard = login_required('student')
-    if guard:
-        return guard
-
     student_id = session.get('user_id')
 
     conn = get_db_connection()
@@ -299,6 +327,7 @@ def ai_recommendation(test_id):
 
     result = cursor.fetchone()
 
+    cursor.close()
     conn.close()
 
     if result and result['score'] < 3:
@@ -312,12 +341,8 @@ def ai_recommendation(test_id):
 
 # ---------------- STUDENT SUBMIT ASSIGNMENT ----------------
 @app.route('/student/submit/<int:assignment_id>', methods=['GET','POST'])
+@login_required('student')  
 def submit_assignment(assignment_id):
-
-    guard = login_required('student')
-    if guard:
-        return guard
-
     student_id = session.get('user_id')
 
     conn = get_db_connection()
@@ -336,19 +361,18 @@ def submit_assignment(assignment_id):
         conn.commit()
 
         return redirect('/student/assignments')
-
+    
+    cursor.close()
     conn.close()
 
     return render_template('student/submit_assignment.html')
 
 # ---------- TEACHER TIMETABLE ----------
 @app.route('/teacher/timetable')
+@login_required('teacher')  
 def teacher_timetable():
-    guard = login_required('teacher')
-    if guard:
-        return guard
-
     teacher_id = session.get('user_id')
+
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
@@ -362,22 +386,24 @@ def teacher_timetable():
     """, (teacher_id,))
 
     schedule = cursor.fetchall()
+
+    cursor.close()
     conn.close()
+
     return render_template('teacher/timetable.html', schedule=schedule)
 
 
 # ---------------- TEACHER ASSIGNMENTS ----------------
 @app.route('/teacher/assignments', methods=['GET', 'POST'])
-def teacher_assignments():
-    guard = login_required('teacher')
-    if guard:
-        return guard
+@login_required('teacher')
 
+def teacher_assignments():
     teacher_id = session.get('user_id')
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
+    # Create assignment
     if request.method == 'POST':
         title = request.form['title']
         description = request.form['description']
@@ -391,23 +417,34 @@ def teacher_assignments():
 
         conn.commit()
 
+    # Subjects for dropdown
     cursor.execute("SELECT id, subject_name FROM subjects")
     subjects = cursor.fetchall()
 
+    # Fetch assignments created by this teacher
+    cursor.execute("""
+        SELECT a.title, a.description, a.due_date, s.subject_name
+        FROM assignments a
+        JOIN subjects s ON a.subject_id = s.id
+        WHERE a.teacher_id = %s
+    """, (teacher_id,))
+
+    assignments = cursor.fetchall()
+
+    cursor.close()
     conn.close()
 
     return render_template(
         'teacher/assignments.html',
-        subjects=subjects
+        subjects=subjects,
+        assignments=assignments
     )
+
+
 # ---------------- TEACHER CREATE TEST ----------------
 @app.route('/teacher/create_test', methods=['GET','POST'])
+@login_required('teacher')
 def create_test():
-
-    guard = login_required('teacher')
-    if guard:
-        return guard
-
     teacher_id = session.get('user_id')
 
     conn = get_db_connection()
@@ -428,6 +465,7 @@ def create_test():
     cursor.execute("SELECT id, subject_name FROM subjects")
     subjects = cursor.fetchall()
 
+    cursor.close()
     conn.close()
 
     return render_template(
@@ -437,11 +475,8 @@ def create_test():
 
 # ---------------- TEACHER ADD QUESTIONS ----------------
 @app.route('/teacher/add_questions/<int:test_id>', methods=['GET','POST'])
+@login_required('teacher')
 def add_questions(test_id):
-
-    guard = login_required('teacher')
-    if guard:
-        return guard
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -462,6 +497,7 @@ def add_questions(test_id):
 
         conn.commit()
 
+    cursor.close()
     conn.close()
 
     return render_template(
@@ -471,11 +507,9 @@ def add_questions(test_id):
 
 # ---------------- TEACHER VIEW TEST RESULTS ----------------
 @app.route('/teacher/results/<int:test_id>')
+@login_required('teacher')
 def teacher_results(test_id):
-
-    guard = login_required('teacher')
-    if guard:
-        return guard
+    teacher_id = session.get('user_id')
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -484,11 +518,13 @@ def teacher_results(test_id):
     SELECT u.name, r.score
     FROM results r
     JOIN users u ON r.student_id = u.id
-    WHERE r.test_id=%s
-    """,(test_id,))
+    JOIN tests t ON r.test_id = t.id
+    WHERE r.test_id=%s AND t.teacher_id=%s
+    """,(test_id, teacher_id))
 
     results = cursor.fetchall()
 
+    cursor.close()
     conn.close()
 
     return render_template(
@@ -501,10 +537,8 @@ import csv
 from flask import Response
 
 @app.route('/teacher/export_results/<int:test_id>')
+@login_required('teacher')
 def export_results(test_id):
-    guard = login_required('teacher')
-    if guard:
-        return guard
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -517,6 +551,8 @@ def export_results(test_id):
     """, (test_id,))
 
     rows = cursor.fetchall()
+
+    cursor.close()
     conn.close()
 
     def generate():
@@ -532,12 +568,8 @@ def export_results(test_id):
 
 # ---------------- TEACHER STUDY MATERIALS ----------------
 @app.route('/teacher/materials', methods=['GET','POST'])
+@login_required('teacher')
 def teacher_materials():
-
-    guard = login_required('teacher')
-    if guard:
-        return guard
-
     teacher_id = session.get('user_id')
 
     conn = get_db_connection()
@@ -547,24 +579,40 @@ def teacher_materials():
 
         title = request.form['title']
         subject_id = request.form['subject_id']
+
+        if 'file' not in request.files:
+            flash("No file selected", "error")
+            return redirect('/teacher/materials')
+
         file = request.files['file']
 
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        if file and allowed_file(file.filename):
 
-        file.save(filepath)
+            filename = secure_filename(file.filename)
 
-        cursor.execute("""
-        INSERT INTO study_materials
-        (title, file_name, subject_id, teacher_id)
-        VALUES (%s,%s,%s,%s)
-        """,(title, filename, subject_id, teacher_id))
+            unique_filename = str(int(time.time())) + "_" + filename
 
-        conn.commit()
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+            file.save(filepath)
+
+            cursor.execute("""
+            INSERT INTO study_materials
+            (title, file_name, subject_id, teacher_id)
+            VALUES (%s,%s,%s,%s)
+            """,(title, unique_filename, subject_id, teacher_id))
+
+            conn.commit()
+
+            flash("Material uploaded successfully!", "success")
+
+        else:
+            flash("Invalid file type. Only PDF, DOC, PPT, Images allowed.", "error")
+            return redirect('/teacher/materials')
 
     cursor.execute("SELECT id, subject_name FROM subjects")
     subjects = cursor.fetchall()
 
+    cursor.close()
     conn.close()
 
     return render_template(
@@ -574,10 +622,8 @@ def teacher_materials():
 
 # ---------------- ADMIN: CREATE USER ----------------
 @app.route('/admin/create-user', methods=['GET', 'POST'])
+@login_required('admin')
 def create_user():
-    guard = login_required('admin')
-    if guard:
-        return guard
 
     if request.method == 'POST':
         name = request.form['name']
@@ -608,12 +654,8 @@ def create_user():
 
 # ---------------- ADMIN ANALYTICS ----------------
 @app.route('/admin/analytics')
+@login_required('admin')
 def admin_analytics():
-
-
-    guard = login_required('admin')
-    if guard:
-        return guard
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -627,6 +669,7 @@ def admin_analytics():
     cursor.execute("SELECT COUNT(*) total FROM tests")
     tests = cursor.fetchone()['total']
 
+    cursor.close()
     conn.close()
 
     return render_template(
@@ -638,10 +681,9 @@ def admin_analytics():
 
 # ---------------- ADMIN: VIEW USERS LIST ----------------
 @app.route('/admin/users')
+@login_required('admin')
 def view_users():
-    guard = login_required('admin')
-    if guard:
-        return guard
+
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -656,10 +698,8 @@ def view_users():
 
 # ---------------- ADMIN: TOGGLE USER STATUS ----------------
 @app.route('/admin/toggle-user/<int:user_id>')
+@login_required('admin')
 def toggle_user(user_id):
-    guard = login_required('admin')
-    if guard:
-        return guard
 
     # Prevent admin from deactivating themselves
     if user_id == session.get('user_id'):
@@ -682,25 +722,25 @@ def toggle_user(user_id):
     flash("User status updated successfully", "success")
     return redirect('/admin/users')
 
-    # ---------------- ADMIN: SEARCH STUDENTS ----------------
+# ---------------- ADMIN: SEARCH STUDENTS ----------------
 @app.route('/admin/search_students')
+@login_required('admin')
 def search_students():
 
-    guard = login_required('admin')
-    if guard:
-        return guard
-
-    keyword = request.args.get('q')
+    keyword = request.args.get('q', ' ').strip()
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
+
     cursor.execute("""
     SELECT * FROM users
     WHERE role='student'
     AND name LIKE %s
-    """,('%'+keyword+'%',))  # note: your table column is probably 'name' not 'username'
+    """,('%'+keyword+'%',))  
 
     students = cursor.fetchall()
+
+    cursor.close()
     conn.close()
 
     return render_template(
@@ -711,25 +751,25 @@ def search_students():
 
 # ---------------- ADMIN: VIEW CLASSES ----------------
 @app.route('/admin/classes')
+@login_required('admin')
 def view_classes():
-    guard = login_required('admin')
-    if guard:
-        return guard
+
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT * FROM classes WHERE is_active=1")
     classes = cursor.fetchall()
+
+    cursor.close()
     conn.close()
 
     return render_template('admin/classes_list.html', classes=classes)
 
 # ---------------- ADMIN: ADD CLASS ----------------
 @app.route('/admin/classes/add', methods=['GET', 'POST'])
+@login_required('admin')
 def add_class():
-    guard = login_required('admin')
-    if guard:
-        return guard
+
 
     if request.method == 'POST':
         class_name = request.form['class_name']
@@ -748,6 +788,7 @@ def add_class():
         except:
             flash("Class already exists")
         finally:
+            cursor.close()
             conn.close()
 
         return redirect('/admin/classes')
@@ -756,10 +797,9 @@ def add_class():
 
 # ---------------- ADMIN: VIEW SUBJECTS ----------------
 @app.route('/admin/subjects')
+@login_required('admin')
 def view_subjects():
-    guard = login_required('admin')
-    if guard:
-        return guard
+
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -772,15 +812,14 @@ def view_subjects():
     """)
     subjects = cursor.fetchall()
 
+    cursor.close()
     conn.close()
     return render_template('admin/subjects_list.html', subjects=subjects)
 
 # ---------------- ADMIN: ADD SUBJECT ----------------
 @app.route('/admin/subjects/add', methods=['GET', 'POST'])
+@login_required('admin')
 def add_subject():
-    guard = login_required('admin')
-    if guard:
-        return guard
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -798,21 +837,24 @@ def add_subject():
         cursor2.close()
 
         flash("Subject added successfully", "success")
+
+        cursor.close()
         conn.close()
+
         return redirect('/admin/subjects')
 
     cursor.execute("SELECT id, class_name FROM classes WHERE is_active=1")
     classes = cursor.fetchall()
 
+    cursor.close()
     conn.close()
     return render_template('admin/add_subject.html', classes=classes)
 
 # ---------------- CLASS → SUBJECTS VIEW ----------------
 @app.route('/admin/classes/<int:class_id>/subjects')
+@login_required('admin')
 def class_subjects(class_id):
-    guard = login_required('admin')
-    if guard:
-        return guard
+
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -829,6 +871,7 @@ def class_subjects(class_id):
     """, (class_id,))
     subjects = cursor.fetchall()
 
+    cursor.close()
     conn.close()
     return render_template(
         'admin/class_subjects.html',
@@ -840,10 +883,9 @@ def class_subjects(class_id):
 
 # View existing mappings
 @app.route('/admin/teacher-subjects')
+@login_required('admin')
 def view_teacher_subjects():
-    guard = login_required('admin')
-    if guard:
-        return guard
+
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -857,15 +899,14 @@ def view_teacher_subjects():
     """)
     mappings = cursor.fetchall()
 
+    cursor.close()
     conn.close()
     return render_template('admin/teacher_subjects_list.html', mappings=mappings)
 
 # Add a new mapping
 @app.route('/admin/teacher-subjects/add', methods=['GET', 'POST'])
+@login_required('admin')
 def add_teacher_subject():
-    guard = login_required('admin')
-    if guard:
-        return guard
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -887,7 +928,9 @@ def add_teacher_subject():
         except mysql.connector.errors.IntegrityError:
             flash("This mapping already exists", "error")
         
+        cursor.close()
         conn.close()
+
         return redirect('/admin/teacher-subjects')
 
     # GET method: fetch dropdowns
@@ -900,6 +943,7 @@ def add_teacher_subject():
     cursor.execute("SELECT id, subject_name FROM subjects WHERE is_active=1")
     subjects = cursor.fetchall()
 
+    cursor.close()
     conn.close()
     return render_template(
         'admin/assign_teacher_subject.html',
@@ -910,10 +954,8 @@ def add_teacher_subject():
 
 # ---------------- ADMIN: ASSIGN STUDENT TO CLASS ----------------
 @app.route('/admin/assign-student', methods=['GET', 'POST'])
+@login_required('admin')
 def assign_student_class():
-    guard = login_required('admin')
-    if guard:
-        return guard
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -934,6 +976,7 @@ def assign_student_class():
         except mysql.connector.errors.IntegrityError:
             flash("Student already assigned to a class", "error")
 
+        cursor.close()
         conn.close()
         return redirect('/admin/assign-student')
     
@@ -944,15 +987,15 @@ def assign_student_class():
     cursor.execute("SELECT id, class_name FROM classes WHERE is_active=1")
     classes = cursor.fetchall()
 
+    cursor.close()
     conn.close()
     return render_template('admin/assign_student_class.html', students=students, classes=classes)
 
 # ---------------- STUDENT: VIEW MY CLASS ----------------
 @app.route('/student/my-class')
+@login_required('student')
 def student_my_class():
-    guard = login_required('student')
-    if guard:
-        return guard
+
 
     student_id = session.get('user_id')
 
@@ -967,16 +1010,15 @@ def student_my_class():
     """, (student_id,))
 
     class_data = cursor.fetchone()
+    cursor.close()
     conn.close()
 
     return render_template('student/my_class.html', class_data=class_data)
 
 # ---------------- TEACHER: VIEW MY STUDENTS ----------------
 @app.route('/teacher/my-students')
+@login_required('teacher')
 def teacher_my_students():
-    guard = login_required('teacher')
-    if guard:
-        return guard
 
     teacher_id = session.get('user_id')
 
@@ -993,16 +1035,16 @@ def teacher_my_students():
     """, (teacher_id,))
 
     students = cursor.fetchall()
+    cursor.close()
     conn.close()
 
     return render_template('teacher/my_students.html', students=students)
 
 # ---------------- TEACHER: MARK ATTENDANCE ----------------
 @app.route('/teacher/attendance', methods=['GET', 'POST'])
+@login_required('teacher')
 def mark_attendance():
-    guard = login_required('teacher')
-    if guard:
-        return guard
+    
 
     teacher_id = session.get('user_id')
     today = date.today()
@@ -1059,6 +1101,7 @@ def mark_attendance():
         return redirect('/teacher/attendance')
 
     # GET request: render attendance form
+    cursor.close()
     conn.close()
     return render_template(
         'teacher/mark_attendance.html',
@@ -1066,7 +1109,6 @@ def mark_attendance():
         subject=mapping,
         today=today
     )
-
 
 # ---------------- Logout Route ----------------
 @app.route('/logout')

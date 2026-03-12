@@ -5,6 +5,8 @@ CREATE TABLE results (
     score INT,
     submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 
+    UNIQUE KEY unique_attempt (student_id, test_id),
+
     FOREIGN KEY (student_id) REFERENCES users(id),
     FOREIGN KEY (test_id) REFERENCES tests(id)
 );

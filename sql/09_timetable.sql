@@ -1,5 +1,3 @@
-USE ai_college_erp;
-
 CREATE TABLE timetable (
     id INT AUTO_INCREMENT PRIMARY KEY,
     class_id INT NOT NULL,
