@@ -196,7 +196,9 @@ def add_class():
 
     if request.method == 'POST':
         class_name = request.form['class_name']
-        academic_year = request.form['academic_year']
+        start_year = request.form['start_year']
+        end_year = request.form['end_year']
+        academic_year = f"{start_year}-{str(end_year)[-2:]}"
 
         conn = get_db_connection()
         cursor = conn.cursor()

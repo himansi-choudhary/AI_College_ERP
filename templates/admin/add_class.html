@@ -1,15 +1,57 @@
-{% extends 'base.html' %}
-
-{% block content %}
+{% extends 'base.html' %} {% block content %}
 <h2>Add Class</h2>
 
 <form method="POST">
-    <label>Class Name</label><br>
-    <input type="text" name="class_name" required><br><br>
+  <label>Class Name</label><br />
+  <input type="text" name="class_name" required /><br /><br />
 
-    <label>Academic Year</label><br>
-    <input type="text" name="academic_year" required><br><br>
+  <label>Academic Year</label><br />
+  <div style="display: flex; gap: 10px; align-items: end">
+    <select name="start_year" id="start_year" required style="flex: 1">
+      <option value="">Select Start Year</option>
+      {% for year in range(2020, 2031) %}
+      <option value="{{ year }}">{{ year }}</option>
+      {% endfor %}
+    </select>
+    <span>to</span>
+    <select name="end_year" id="end_year" required style="flex: 1">
+      <option value="">Select End Year</option>
+      {% for year in range(2021, 2032) %}
+      <option value="{{ year }}">{{ year }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div
+    id="year_preview"
+    style="margin-top: 5px; font-weight: bold; color: #007bff"
+  ></div>
+  <br />
 
-    <button type="submit">Add Class</button>
+  <button type="submit">Add Class</button>
 </form>
+
+<script>
+  document.getElementById("start_year").addEventListener("change", function () {
+    const startYear = parseInt(this.value);
+    if (startYear) {
+      const endYear = startYear + 1;
+      document.getElementById("end_year").value = endYear;
+      updatePreview();
+    }
+  });
+
+  document.getElementById("end_year").addEventListener("change", updatePreview);
+
+  function updatePreview() {
+    const start = document.getElementById("start_year").value;
+    const end = document.getElementById("end_year").value;
+    if (start && end) {
+      const preview = `${start}-${end.toString().slice(-2)}`;
+      document.getElementById("year_preview").textContent =
+        `Selected: ${preview}`;
+    } else {
+      document.getElementById("year_preview").textContent = "";
+    }
+  }
+</script>
 {% endblock %}
