@@ -328,6 +328,60 @@ def view_teacher_subjects():
     conn.close()
     return render_template('admin/teacher_subjects_list.html', mappings=mappings)
 
+# AJAX: Get academic years for a class (same class_name)
+@admin_bp.route('/get_academic_years/<int:class_id>')
+@login_required('admin')
+def get_academic_years(class_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    # Get class_name first
+    cursor.execute("SELECT class_name FROM classes WHERE id = %s", (class_id,))
+    class_data = cursor.fetchone()
+    
+    if not class_data:
+        conn.close()
+        return {'error': 'Class not found'}, 404
+    
+    class_name = class_data['class_name']
+    
+    # Get DISTINCT academic years for same class_name
+    cursor.execute("""
+        SELECT DISTINCT academic_year 
+        FROM classes 
+        WHERE class_name = %s AND is_active = 1 
+        ORDER BY academic_year
+    """, (class_name,))
+    
+    years = cursor.fetchall()
+    
+    cursor.close()
+    conn.close()
+    return {'years': [year['academic_year'] for year in years]}
+
+
+# AJAX: Get subjects for class + academic year
+@admin_bp.route('/get_subjects/<int:class_id>/<academic_year>')
+@login_required('admin')
+def get_subjects(class_id, academic_year):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    # Get subjects for this specific class_id
+    cursor.execute("""
+        SELECT id, subject_name 
+        FROM subjects 
+        WHERE class_id = %s AND is_active = 1
+        ORDER BY subject_name
+    """, (class_id,))
+    
+    subjects = cursor.fetchall()
+    
+    cursor.close()
+    conn.close()
+    return {'subjects': subjects}
+
+
 # Add a new mapping
 @admin_bp.route('/teacher-subjects/add', methods=['GET', 'POST'])
 @login_required('admin')
@@ -358,23 +412,19 @@ def add_teacher_subject():
 
         return redirect('/admin/teacher-subjects')
 
-    # GET method: fetch dropdowns
+    # GET method: fetch dropdowns (removed subjects - now AJAX)
     cursor.execute("SELECT id, name FROM users WHERE role='teacher' AND is_active=1")
     teachers = cursor.fetchall()
 
     cursor.execute("SELECT id, class_name FROM classes WHERE is_active=1")
     classes = cursor.fetchall()
 
-    cursor.execute("SELECT id, subject_name FROM subjects WHERE is_active=1")
-    subjects = cursor.fetchall()
-
     cursor.close()
     conn.close()
     return render_template(
         'admin/assign_teacher_subject.html',
         teachers=teachers,
-        classes=classes,
-        subjects=subjects
+        classes=classes
     )
 
 # ---------------- ADMIN: ASSIGN STUDENT TO CLASS ----------------

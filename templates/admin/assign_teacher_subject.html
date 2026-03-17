@@ -1,30 +1,96 @@
-{% extends 'base.html' %}
+{% extends 'base.html' %} {% block content %}
+<h2>Assign Teacher → Class → Academic Year → Subject</h2>
 
-{% block content %}
-<h2>Assign Teacher → Class → Subject</h2>
-
-<form method="POST">
+<form method="POST" id="assignForm">
   <label>Teacher:</label>
   <select name="teacher_id" required>
+    <option value="">Select Teacher</option>
     {% for t in teachers %}
-      <option value="{{ t.id }}">{{ t.name }}</option>
+    <option value="{{ t.id }}">{{ t.name }}</option>
     {% endfor %}
   </select>
-
+  <br>
   <label>Class:</label>
-  <select name="class_id" required>
+  <select name="class_id" id="classSelect" required>
+    <option value="">Select Class</option>
     {% for c in classes %}
-      <option value="{{ c.id }}">{{ c.class_name }}</option>
+    <option value="{{ c.id }}">{{ c.class_name }}</option>
     {% endfor %}
   </select>
-
+  <br>
+  <label>Academic Year:</label>
+  <select name="academic_year" id="yearSelect" disabled>
+    <option value="">Select Academic Year</option>
+  </select>
+  <br>
   <label>Subject:</label>
-  <select name="subject_id" required>
-    {% for s in subjects %}
-      <option value="{{ s.id }}">{{ s.subject_name }}</option>
-    {% endfor %}
+  <select name="subject_id" id="subjectSelect" disabled required>
+    <option value="">Select Subject</option>
   </select>
 
-  <button type="submit">Assign</button>
+  <br /><br />
+  <button type="submit">Assign Teacher to Subject</button>
 </form>
+
+<script>
+  document
+    .getElementById("classSelect")
+    .addEventListener("change", function () {
+      const classId = this.value;
+      const yearSelect = document.getElementById("yearSelect");
+      const subjectSelect = document.getElementById("subjectSelect");
+
+      // Reset dependent dropdowns
+      yearSelect.innerHTML = '<option value="">Select Academic Year</option>';
+      subjectSelect.innerHTML = '<option value="">Select Subject</option>';
+      yearSelect.disabled = true;
+      subjectSelect.disabled = true;
+
+      if (classId) {
+        // Fetch academic years
+        fetch(`/admin/get_academic_years/${classId}`)
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.years && data.years.length > 0) {
+              data.years.forEach((year) => {
+                const option = document.createElement("option");
+                option.value = year;
+                option.textContent = year;
+                yearSelect.appendChild(option);
+              });
+              yearSelect.disabled = false;
+            }
+          })
+          .catch((error) => console.error("Error:", error));
+      }
+    });
+
+  document.getElementById("yearSelect").addEventListener("change", function () {
+    const classId = document.getElementById("classSelect").value;
+    const year = this.value;
+    const subjectSelect = document.getElementById("subjectSelect");
+
+    // Reset subjects
+    subjectSelect.innerHTML = '<option value="">Select Subject</option>';
+    subjectSelect.disabled = true;
+
+    if (classId && year) {
+      // Fetch subjects for class + year
+      fetch(`/admin/get_subjects/${classId}/${encodeURIComponent(year)}`)
+        .then((response) => response.json())
+        .then((data) => {
+          if (data.subjects && data.subjects.length > 0) {
+            data.subjects.forEach((subject) => {
+              const option = document.createElement("option");
+              option.value = subject.id;
+              option.textContent = subject.subject_name;
+              subjectSelect.appendChild(option);
+            });
+            subjectSelect.disabled = false;
+          }
+        })
+        .catch((error) => console.error("Error:", error));
+    }
+  });
+</script>
 {% endblock %}
