@@ -6,7 +6,7 @@ auth_bp = Blueprint('auth', __name__)
 
 @auth_bp.route('/')
 def home():
-    return "Smart campus ERP Running"
+    return render_template('home.html')
 
 @auth_bp.route('/login', methods=['GET','POST'])
 def login():

@@ -1,78 +1,94 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI College ERP{% endblock %}</title>
 
-<title>{% block title %}AI College ERP{% endblock %}</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+  </head>
 
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
+  <body>
+    <nav class="top-nav">
+      <div class="nav-left">
+        <a href="/" class="brand">Smart Campus ERP System</a>
+        <a href="/">Home</a>
 
-<body>
+        {% if session.get('role') == 'admin' %}
+        <a href="/admin/dashboard">Dashboard</a>
+        <a href="/admin/create-user">Create User</a>
+        <a href="/admin/users">Users</a>
+        <a href="/admin/classes">Classes</a>
+        <a href="/admin/subjects">Subjects</a>
+        <a href="/admin/teacher-subjects">Teacher ↔ Subject Mapping</a>
+        <a href="/admin/assign-student">Assign Student</a>
+        <a href="/admin/analytics">Analytics</a>
 
-<nav>
-<div class="nav-left">
+        {% elif session.get('role') == 'teacher' %}
+        <a href="/teacher/dashboard">Dashboard</a>
+        <a href="/teacher/my-students">My Students</a>
+        <a href="/teacher/timetable">View Timetable</a>
+        <a href="/teacher/attendance">Mark Attendance</a>
+        <a href="/teacher/create_test">Create Test</a>
+        <a href="/teacher/materials">Upload Materials</a>
+        <a href="/teacher/assignments">Assignments</a>
 
-<a href="/">Home</a>
+        {% elif session.get('role') == 'student' %}
+        <a href="/student/dashboard">Dashboard</a>
+        <a href="/student/my-class">My Class</a>
+        <a href="/student/assignments">Assignments</a>
+        <a href="/student/materials">Study Materials</a>
+        <a href="/student/tests">Tests</a>
+        <a href="/student/results">Results</a>
 
-{% if session.get('role') == 'admin' %}
-<a href="/admin/dashboard">Dashboard</a>
-<a href="/admin/create-user">Create User</a>
-<a href="/admin/users">Users</a>
-<a href="/admin/classes">Classes</a>
-<a href="/admin/subjects">Subjects</a>
-<a href="/admin/teacher-subjects">Teacher ↔ Subject Mapping</a>
- <a href="/admin/assign-student">Assign Student</a>
-<a href="/admin/analytics">Analytics</a>
+        {% endif %}
+      </div>
 
+      <div class="nav-right">
+        {% if session.get('user_id') %}
+        <a href="/logout" class="auth-link">Logout</a>
+        {% else %}
+        <a href="/login" class="auth-link">Login</a>
+        {% endif %}
+      </div>
+    </nav>
 
-{% elif session.get('role') == 'teacher' %}
-<a href="/teacher/dashboard">Dashboard</a>
-<a href="/teacher/my-students">My Students</a>
-<a href="/teacher/timetable">View Timetable</a>
-<a href="/teacher/attendance">Mark Attendance</a>
-<a href="/teacher/create_test">Create Test</a>
-<a href="/teacher/materials">Upload Materials</a>
-<a href="/teacher/assignments">Assignments</a>
+    <main class="container {% block container_class %}{% endblock %}">
+      {% with messages = get_flashed_messages(with_categories=True) %} {% if
+      messages %}
+      <div class="flash-stack">
+        {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+      {% endif %} {% endwith %} {% block content %}{% endblock %}
+    </main>
 
-{% elif session.get('role') == 'student' %}
-<a href="/student/dashboard">Dashboard</a>
-<a href="/student/my-class">My Class</a>
-<a href="/student/assignments">Assignments</a>
-<a href="/student/materials">Study Materials</a>
-<a href="/student/tests">Tests</a>
-<a href="/student/results">Results</a>
+    <footer class="footer">
+      <div class="footer-content">
 
-{% endif %}
+        <div class="footer-brand">
+          <a href="/" class="brand">Smart Campus ERP System</a>
+        </div>
 
-</div>
+        <div class="footer-links">
+          <a href="/">Home</a>
+          <a href="/login">Login</a>
+          <a href="/admin/dashboard">Admin</a>
+          <a href="/teacher/dashboard">Teacher</a>
+          <a href="/student/dashboard">Student</a>
+        </div>
 
-<div class="nav-right">
-{% if session.get('user_id') %}
-<a href="/logout">Logout</a>
-{% else %}
-<a href="/login">Login</a>
-{% endif %}
-</div>
+        <div class="footer-copy">
+          &copy; 2024 AI College ERP. All rights reserved. <br>
+          Developed by Himansi and Komal.
+        </div>
 
-</nav>
-
-<div class="container">
-
-{% with messages = get_flashed_messages(with_categories=True) %}
-{% if messages %}
-{% for category, message in messages %}
-<div class="flash {{ category }}">{{ message }}</div>
-{% endfor %}
-{% endif %}
-{% endwith %}
-
-{% block content %}{% endblock %}
-
-</div>
-
-</body>
-
+      </div>
+    </footer>
+  </body>
 </html>

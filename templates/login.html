@@ -1,17 +1,28 @@
-{% extends "base.html" %}
+{% extends "base.html" %} {% block title %}Login{% endblock %} {% block
+container_class %}full-width-container{% endblock %} {% block content %}
+<div class="login-hero">
+  <div class="login-card">
+    <h2>Login</h2>
 
-{% block title %}Login{% endblock %}
+    <form method="POST">
+      <label>Email:</label>
+      <input
+        type="email"
+        name="email"
+        placeholder="Enter your email"
+        required
+      />
 
-{% block content %}
-<h2>Login</h2>
+      <label>Password:</label>
+      <input
+        type="password"
+        name="password"
+        placeholder="Enter your password"
+        required
+      />
 
-<form method="POST">
-    <label>Email:</label><br>
-    <input type="email" name="email" required><br><br>
-
-    <label>Password:</label><br>
-    <input type="password" name="password" required><br><br>
-
-    <button type="submit">Login</button>
-</form>
-{% endblock %}
+      <button type="submit">Login</button>
+    </form>
+  </div>
+  {% endblock %}
+</div>

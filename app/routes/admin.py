@@ -9,7 +9,40 @@ admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 @admin_bp.route('/dashboard')
 @login_required('admin')
 def admin_dashboard():
-    return render_template('admin/admin_dashboard.html')
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    # Stats queries
+    cursor.execute("SELECT COUNT(*) total FROM users WHERE role='student'")
+    students = cursor.fetchone()['total']
+
+    cursor.execute("SELECT COUNT(*) total FROM users WHERE role='teacher'")
+    teachers = cursor.fetchone()['total']
+
+    cursor.execute("SELECT COUNT(*) total FROM classes WHERE is_active=1")
+    classes = cursor.fetchone()['total']
+
+    cursor.execute("SELECT COUNT(*) total FROM subjects WHERE is_active=1")
+    subjects = cursor.fetchone()['total']
+
+    cursor.execute("SELECT COUNT(*) total FROM tests")
+    tests = cursor.fetchone()['total']
+
+    cursor.execute("SELECT id, name, email, role FROM users ORDER BY id DESC LIMIT 5")
+    recent_users = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return render_template(
+        'admin/admin_dashboard.html',
+        students=students,
+        teachers=teachers,
+        classes=classes,
+        subjects=subjects,
+        tests=tests,
+        recent_users=recent_users
+    )
 
 # ---------------- ADMIN: CREATE USER ----------------
 @admin_bp.route('/create-user', methods=['GET', 'POST'])
@@ -160,7 +193,6 @@ def view_classes():
 @admin_bp.route('/classes/add', methods=['GET', 'POST'])
 @login_required('admin')
 def add_class():
-
 
     if request.method == 'POST':
         class_name = request.form['class_name']
