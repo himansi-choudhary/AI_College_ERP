@@ -335,7 +335,28 @@ def view_teacher_subjects():
     conn.close()
     return render_template('admin/teacher_subjects_list.html', mappings=mappings)
 
-# AJAX: Get academic years for a class (same class_name)
+# AJAX: Get ALL active academic years
+@admin_bp.route('/get_academic_years')
+@login_required('admin')
+def get_all_academic_years():
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    cursor.execute("""
+        SELECT DISTINCT academic_year 
+        FROM classes 
+        WHERE academic_year IS NOT NULL AND is_active = 1
+        ORDER BY academic_year DESC
+    """)
+    
+    years = cursor.fetchall()
+    
+    cursor.close()
+    conn.close()
+    return {'years': [year['academic_year'] for year in years]}
+
+
+# AJAX: Get academic years for a class (same class_name) - BACKWARD COMPATIBILITY
 @admin_bp.route('/get_academic_years/<int:class_id>')
 @login_required('admin')
 def get_academic_years(class_id):
@@ -388,20 +409,30 @@ def get_classes_by_year(academic_year):
     return {'classes': classes}
 
 
-# AJAX: Get subjects for class + academic year
-@admin_bp.route('/get_subjects/<int:class_id>/<academic_year>')
+# AJAX: Get subjects for class + year + available for specific teacher
+@admin_bp.route('/get_subjects/<int:class_id>/<academic_year>/<int:teacher_id>')
 @login_required('admin')
-def get_subjects(class_id, academic_year):
+def get_available_subjects(class_id, academic_year, teacher_id):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     
-    # Get subjects for this specific class_id
     cursor.execute("""
-        SELECT id, subject_name 
-        FROM subjects 
-        WHERE class_id = %s AND is_active = 1
-        ORDER BY subject_name
-    """, (class_id,))
+        SELECT s.id, s.subject_name 
+        FROM subjects s
+        JOIN classes c ON s.class_id = c.id
+        WHERE s.class_id = %s 
+          AND s.academic_year = %s
+          AND s.is_active = 1
+          AND c.is_active = 1
+          AND c.academic_year = %s
+          AND NOT EXISTS (
+              SELECT 1 FROM teacher_subjects ts 
+              WHERE ts.teacher_id = %s 
+                AND ts.class_id = %s 
+                AND ts.subject_id = s.id
+          )
+        ORDER BY s.subject_name
+    """, (class_id, academic_year, academic_year, teacher_id, class_id))
     
     subjects = cursor.fetchall()
     
@@ -440,19 +471,24 @@ def add_teacher_subject():
 
         return redirect('/admin/teacher-subjects')
 
-    # GET method: fetch dropdowns (removed subjects - now AJAX)
+    # GET method: fetch dropdowns (years instead of classes for new flow)
     cursor.execute("SELECT id, name FROM users WHERE role='teacher' AND is_active=1")
     teachers = cursor.fetchall()
 
-    cursor.execute("SELECT id, class_name FROM classes WHERE is_active=1")
-    classes = cursor.fetchall()
+    cursor.execute("""
+        SELECT DISTINCT academic_year 
+        FROM classes 
+        WHERE academic_year IS NOT NULL AND is_active = 1
+        ORDER BY academic_year DESC
+    """)
+    all_years = [row['academic_year'] for row in cursor.fetchall()]
 
     cursor.close()
     conn.close()
     return render_template(
         'admin/assign_teacher_subject.html',
         teachers=teachers,
-        classes=classes
+        all_years=all_years
     )
 
 # ---------------- ADMIN: ASSIGN STUDENT TO CLASS ----------------
