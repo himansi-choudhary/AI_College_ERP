@@ -519,14 +519,11 @@ def assign_student_class():
         conn.close()
         return redirect('/admin/assign-student')
     
-    # GET: dropdown data
+    # GET: dropdown data (classes loaded via AJAX)
     cursor.execute("SELECT id, name FROM users WHERE role='student' AND is_active=1")
     students = cursor.fetchall()
 
-    cursor.execute("SELECT id, class_name FROM classes WHERE is_active=1")
-    classes = cursor.fetchall()
-
     cursor.close()
     conn.close()
-    return render_template('admin/assign_student_class.html', students=students, classes=classes)
+    return render_template('admin/assign_student_class.html', students=students)
 

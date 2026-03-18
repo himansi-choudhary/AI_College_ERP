@@ -1,23 +1,103 @@
-{% extends 'base.html' %}
+{% extends 'base.html' %} {% block content %}
+<h2>Assign Student → Academic Year → Class</h2>
 
-{% block content %}
-<h2>Assign Student → Class</h2>
+<form method="POST" id="assignForm">
+  <label>Student:</label>
+  <select name="student_id" required>
+    <option value="">Select Student</option>
+    {% for s in students %}
+    <option value="{{ s.id }}">{{ s.name }}</option>
+    {% endfor %}</select
+  ><br /><br />
 
-<form method="POST">
-    <label>Student:</label>
-    <select name="student_id" required>
-        {% for s in students %}
-            <option value="{{ s.id }}">{{ s.name }}</option>
-        {% endfor %}
-    </select><br><br>
+  <label>Academic Year:</label>
+  <select name="academic_year" id="academicYear" required>
+    <option value="">Loading years...</option></select
+  ><br /><br />
 
-    <label>Class:</label>
-    <select name="class_id" required>
-        {% for c in classes %}
-            <option value="{{ c.id }}">{{ c.class_name }}</option>
-        {% endfor %}
-    </select><br><br>
+  <label>Class:</label>
+  <select name="class_id" id="classSelect" required disabled>
+    <option value="">Select Academic Year first</option></select
+  ><br /><br />
 
-    <button type="submit">Assign</button>
+  <button type="submit">Assign Student to Class</button>
 </form>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    // Load academic years
+    fetch("/admin/get_academic_years")
+      .then((response) => response.json())
+      .then((data) => {
+        const yearSelect = document.getElementById("academicYear");
+        yearSelect.innerHTML = '<option value="">Select Academic Year</option>';
+
+        if (data.years && data.years.length > 0) {
+          data.years.forEach((year) => {
+            const option = document.createElement("option");
+            option.value = year;
+            option.textContent = year;
+            yearSelect.appendChild(option);
+          });
+        } else {
+          yearSelect.innerHTML =
+            '<option value="">No academic years found</option>';
+        }
+      })
+      .catch((error) => {
+        console.error("Error loading years:", error);
+        document.getElementById("academicYear").innerHTML =
+          '<option value="">Error loading years</option>';
+      });
+
+    // Cascading: Year → Classes
+    document
+      .getElementById("academicYear")
+      .addEventListener("change", function () {
+        const year = this.value;
+        const classSelect = document.getElementById("classSelect");
+
+        if (year) {
+          classSelect.disabled = true;
+          classSelect.innerHTML =
+            '<option value="">Loading classes...</option>';
+
+          fetch(`/admin/get_classes/${year}`)
+            .then((response) => response.json())
+            .then((data) => {
+              classSelect.innerHTML = '<option value="">Select Class</option>';
+
+              if (data.classes && data.classes.length > 0) {
+                data.classes.forEach((cls) => {
+                  const option = document.createElement("option");
+                  option.value = cls.id;
+                  option.textContent = cls.class_name;
+                  classSelect.appendChild(option);
+                });
+                classSelect.disabled = false;
+              } else {
+                classSelect.innerHTML =
+                  '<option value="">No classes for this year</option>';
+              }
+            })
+            .catch((error) => {
+              console.error("Error loading classes:", error);
+              classSelect.innerHTML =
+                '<option value="">Error loading classes</option>';
+            });
+        } else {
+          classSelect.disabled = true;
+          classSelect.innerHTML =
+            '<option value="">Select Academic Year first</option>';
+        }
+      });
+  });
+</script>
+
+<style>
+  select:disabled {
+    background-color: #f5f5f5;
+    color: #999;
+  }
+</style>
 {% endblock %}
