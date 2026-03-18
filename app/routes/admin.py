@@ -252,11 +252,12 @@ def add_subject():
     if request.method == 'POST':
         subject_name = request.form['subject_name']
         class_id = request.form['class_id']
+        academic_year = request.form.get('academic_year', '')
 
         cursor2 = conn.cursor()
         cursor2.execute(
-            "INSERT INTO subjects (subject_name, class_id) VALUES (%s, %s)",
-            (subject_name, class_id)
+            "INSERT INTO subjects (subject_name, class_id, academic_year) VALUES (%s, %s, %s)",
+            (subject_name, class_id, academic_year)
         )
         conn.commit()
         cursor2.close()

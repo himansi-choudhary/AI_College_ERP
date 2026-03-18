@@ -1,22 +1,23 @@
-{% extends 'base.html' %}
-{% block content %}
+{% extends 'base.html' %} {% block content %}
 
 <h2>Subjects</h2>
 
 <a href="/admin/subjects/add">Add New Subject</a>
 
 <table border="1" cellpadding="5">
-<tr>
+  <tr>
     <th>Subject Name</th>
     <th>Class</th>
-</tr>
+    <th>Academic Year</th>
+  </tr>
 
-{% for s in subjects %}
-<tr>
+  {% for s in subjects %}
+  <tr>
     <td>{{ s.subject_name }}</td>
     <td>{{ s.class_name }}</td>
-</tr>
-{% endfor %}
+    <td>{{ s.academic_year or 'N/A' }}</td>
+  </tr>
+  {% endfor %}
 </table>
 
 {% endblock %}

@@ -1,20 +1,55 @@
-{% extends 'base.html' %}
-{% block content %}
+{% extends 'base.html' %} {% block content %}
 
 <h2>Add Subject</h2>
 
 <form method="POST">
-    <label>Subject Name</label><br>
-    <input type="text" name="subject_name" required><br><br>
+  <label>Subject Name</label><br />
+  <input type="text" name="subject_name" required /><br /><br />
 
-    <label>Class</label><br>
-    <select name="class_id" required>
-        {% for c in classes %}
-        <option value="{{ c.id }}">{{ c.class_name }}</option>
-        {% endfor %}
-    </select><br><br>
+  <label>Class</label><br />
+  <select name="class_id" id="class_id" required onchange="loadYears()">
+    <option value="">Select Class</option>
+    {% for c in classes %}
+    <option value="{{ c.id }}">{{ c.class_name }}</option>
+    {% endfor %}</select
+  ><br /><br />
 
-    <button type="submit">Add Subject</button>
+  <label>Academic Year</label><br />
+  <select name="academic_year" id="academic_year" required>
+    <option value="">First select class</option></select
+  ><br /><br />
+
+  <button type="submit">Add Subject</button>
 </form>
+
+<script>
+  function loadYears() {
+    const classId = document.getElementById("class_id").value;
+    const yearSelect = document.getElementById("academic_year");
+
+    if (!classId) {
+      yearSelect.innerHTML = '<option value="">First select class</option>';
+      return;
+    }
+
+    fetch(`/admin/get_academic_years/${classId}`)
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.error) {
+          yearSelect.innerHTML =
+            '<option value="">Error loading years</option>';
+          return;
+        }
+        yearSelect.innerHTML = '<option value="">Select Year</option>';
+        data.years.forEach((year) => {
+          yearSelect.innerHTML += `<option value="${year}">${year}</option>`;
+        });
+      })
+      .catch((error) => {
+        console.error("Error:", error);
+        yearSelect.innerHTML = '<option value="">Error loading years</option>';
+      });
+  }
+</script>
 
 {% endblock %}

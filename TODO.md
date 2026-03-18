@@ -1,34 +1,14 @@
-# Teacher Subject Mapping Enhancement TODO
+# Add Year Dropdown to Subject Add Form
 
-## Status: ✅ COMPLETE
+## Status: 🚀 In Progress
 
-### 1. Backend Implementation [✅]
+### Steps:
 
-- [x] Add AJAX endpoint: `/admin/get_academic_years/<class_id>`
-- [x] Add AJAX endpoint: `/admin/get_subjects/<class_id>/<academic_year>`
-- [x] Modify `/admin/teacher-subjects/add` GET - removed subjects from initial load
+- [ ] 1. Create DB migration: sql/17_add_academic_year_to_subjects.sql
+- [ ] 2. Update subjects_list.html to display academic_year
+- [ ] 3. Update app/routes/admin.py - add academic_year to INSERT
+- [ ] 4. Update templates/admin/add_subject.html - add year dropdown + AJAX JS
+- [ ] 5. Execute DB migration
+- [ ] 6. Test the form functionality
 
-### 2. Frontend Implementation [✅]
-
-- [x] Update `templates/admin/assign_teacher_subject.html`
-  - [x] Add Academic Year dropdown (initially disabled)
-  - [x] Add Subject dropdown (initially disabled)
-  - [x] Add JavaScript for AJAX calls on dropdown changes
-  - [x] Form submission handling preserved
-
-### 3. Styling [⚠️]
-
-- [ ] CSS styling skipped (optional enhancement)
-
-### 4. Testing [✅]
-
-- [x] Code review complete - logic verified
-- [x] Dynamic flow: Class → Academic Years → Subjects ✓
-- [x] Database relationships preserved
-
-### 5. Completion [✅]
-
-- [x] All core functionality implemented
-- [x] Ready for testing: `python run.py`
-
-**Result:** Teacher subject mapping now shows Class → Academic Year → Class-specific Subjects only!
+**Current Step: 1/6 - Creating DB migration**
