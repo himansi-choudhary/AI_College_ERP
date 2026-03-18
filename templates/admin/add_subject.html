@@ -6,48 +6,55 @@
   <label>Subject Name</label><br />
   <input type="text" name="subject_name" required /><br /><br />
 
-  <label>Class</label><br />
-  <select name="class_id" id="class_id" required onchange="loadYears()">
-    <option value="">Select Class</option>
-    {% for c in classes %}
-    <option value="{{ c.id }}">{{ c.class_name }}</option>
+  <label>Academic Year</label><br />
+  <select
+    name="academic_year"
+    id="academic_year"
+    required
+    onchange="loadClasses()"
+  >
+    <option value="">Select Academic Year</option>
+    {% for year in years %}
+    <option value="{{ year }}">{{ year }}</option>
     {% endfor %}</select
   ><br /><br />
 
-  <label>Academic Year</label><br />
-  <select name="academic_year" id="academic_year" required>
-    <option value="">First select class</option></select
+  <label>Class</label><br />
+  <select name="class_id" id="class_id" required>
+    <option value="">First select academic year</option></select
   ><br /><br />
 
   <button type="submit">Add Subject</button>
 </form>
 
 <script>
-  function loadYears() {
-    const classId = document.getElementById("class_id").value;
+  function loadClasses() {
     const yearSelect = document.getElementById("academic_year");
+    const classSelect = document.getElementById("class_id");
+    const selectedYear = yearSelect.value;
 
-    if (!classId) {
-      yearSelect.innerHTML = '<option value="">First select class</option>';
+    if (!selectedYear) {
+      classSelect.innerHTML =
+        '<option value="">First select academic year</option>';
       return;
     }
 
-    fetch(`/admin/get_academic_years/${classId}`)
+    fetch(`/admin/get_classes/${selectedYear}`)
       .then((response) => response.json())
       .then((data) => {
-        if (data.error) {
-          yearSelect.innerHTML =
-            '<option value="">Error loading years</option>';
+        if (!data.classes || data.classes.length === 0) {
+          classSelect.innerHTML = '<option value="">No classes found</option>';
           return;
         }
-        yearSelect.innerHTML = '<option value="">Select Year</option>';
-        data.years.forEach((year) => {
-          yearSelect.innerHTML += `<option value="${year}">${year}</option>`;
+        classSelect.innerHTML = '<option value="">Select Class</option>';
+        data.classes.forEach((cls) => {
+          classSelect.innerHTML += `<option value="${cls.id}">${cls.class_name}</option>`;
         });
       })
       .catch((error) => {
         console.error("Error:", error);
-        yearSelect.innerHTML = '<option value="">Error loading years</option>';
+        classSelect.innerHTML =
+          '<option value="">Error loading classes</option>';
       });
   }
 </script>

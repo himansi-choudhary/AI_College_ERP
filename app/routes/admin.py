@@ -269,12 +269,18 @@ def add_subject():
 
         return redirect('/admin/subjects')
 
-    cursor.execute("SELECT id, class_name FROM classes WHERE is_active=1")
-    classes = cursor.fetchall()
+    # Get distinct active academic years
+    cursor.execute("""
+        SELECT DISTINCT academic_year 
+        FROM classes 
+        WHERE academic_year IS NOT NULL AND is_active=1 
+        ORDER BY academic_year DESC
+    """)
+    years = [row['academic_year'] for row in cursor.fetchall()]
 
     cursor.close()
     conn.close()
-    return render_template('admin/add_subject.html', classes=classes)
+    return render_template('admin/add_subject.html', years=years)
 
 # ---------------- CLASS → SUBJECTS VIEW ----------------
 @admin_bp.route('/classes/<int:class_id>/subjects')
@@ -359,6 +365,27 @@ def get_academic_years(class_id):
     cursor.close()
     conn.close()
     return {'years': [year['academic_year'] for year in years]}
+
+
+# AJAX: Get classes for academic year
+@admin_bp.route('/get_classes/<academic_year>')
+@login_required('admin')
+def get_classes_by_year(academic_year):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    cursor.execute("""
+        SELECT id, class_name 
+        FROM classes 
+        WHERE academic_year = %s AND is_active = 1
+        ORDER BY class_name
+    """, (academic_year,))
+    
+    classes = cursor.fetchall()
+    
+    cursor.close()
+    conn.close()
+    return {'classes': classes}
 
 
 # AJAX: Get subjects for class + academic year
