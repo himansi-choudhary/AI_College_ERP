@@ -352,7 +352,9 @@ def mark_attendance():
         WHERE ts.teacher_id = %s
     """, (teacher_id,))
 
-    mapping = cursor.fetchone()  
+    mapping = cursor.fetchone()
+    while cursor.nextset():
+        pass
     cursor.close()  
 
     if not mapping:
@@ -369,6 +371,8 @@ def mark_attendance():
         WHERE sc.class_id = %s
     """, (mapping['class_id'],))
     students = student_cursor.fetchall()
+    while student_cursor.nextset():
+        pass
     student_cursor.close()
 
     if request.method == 'POST':
@@ -385,6 +389,8 @@ def mark_attendance():
             """, (student['id'], mapping['subject_id'], today, status, status))
         
         conn.commit()
+        while insert_cursor.nextset():
+            pass
         insert_cursor.close()
         conn.close()
         flash("Attendance saved successfully", "success")
