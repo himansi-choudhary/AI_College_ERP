@@ -1,36 +1,192 @@
-{% extends 'base.html' %}
-{% block content %}
+{% extends 'base.html' %} {% block content %}
 
-<h2>Mark Attendance</h2>
+<div class="container mt-4">
+  <h2>📋 Mark Attendance</h2>
 
-<p>
-  <strong>Class:</strong> {{ subject.class_name }} <br>
-  <strong>Subject:</strong> {{ subject.subject_name }} <br>
-  <strong>Date:</strong> {{ today }}
-</p>
+  <div class="row mb-4">
+    <div class="col-md-4">
+      <label for="classSelect" class="form-label fw-bold"
+        >Class <span class="text-danger">*</span></label
+      >
+      <select class="form-select" id="classSelect" required>
+        <option value="">Select Class...</option>
+        {% for cls in classes %}
+        <option value="{{ cls.id }}">{{ cls.class_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label for="subjectSelect" class="form-label fw-bold"
+        >Subject <span class="text-danger">*</span></label
+      >
+      <select class="form-select" id="subjectSelect" disabled required>
+        <option value="">Select Class first...</option>
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label fw-bold">Date</label>
+      <input
+        type="text"
+        class="form-control"
+        id="dateDisplay"
+        value="{{ today }}"
+        readonly
+      />
+    </div>
+  </div>
 
-<form method="POST">
-<table border="1" cellpadding="8">
-    <tr>
-        <th>Student Name</th>
-        <th>Status</th>
-    </tr>
+  <form method="POST" id="attendanceForm">
+    <input type="hidden" name="class_id" id="classIdHidden" />
+    <input type="hidden" name="subject_id" id="subjectIdHidden" />
 
-    {% for s in students %}
-    <tr>
-        <td>{{ s.name }}</td>
-        <td>
-            <select name="status_{{ s.id }}">
-                <option value="Present">Present</option>
-                <option value="Absent">Absent</option>
-            </select>
-        </td>
-    </tr>
-    {% endfor %}
-</table>
+    <div id="studentsSection" style="display: none">
+      <h4>Students List</h4>
+      <div class="table-responsive">
+        <table class="table table-striped table-hover" id="studentsTable">
+          <thead class="table-dark">
+            <tr>
+              <th>Student Name</th>
+              <th>Attendance</th>
+            </tr>
+          </thead>
+          <tbody id="studentsTableBody">
+            <tr>
+              <td colspan="2" class="text-center text-muted">
+                Select Class → Subject to load students
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
 
-<br>
-<button type="submit">Save Attendance</button>
-</form>
+    <div class="mt-4" id="submitSection" style="display: none">
+      <button
+        type="submit"
+        class="btn btn-success btn-lg"
+        id="submitBtn"
+        disabled
+      >
+        ✅ Save Attendance
+      </button>
+      <a href="/teacher/dashboard" class="btn btn-secondary btn-lg"
+        >← Back to Dashboard</a
+      >
+    </div>
+  </form>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const classSelect = document.getElementById("classSelect");
+    const subjectSelect = document.getElementById("subjectSelect");
+    const studentsSection = document.getElementById("studentsSection");
+    const submitSection = document.getElementById("submitSection");
+    const studentsTableBody = document.getElementById("studentsTableBody");
+    const submitBtn = document.getElementById("submitBtn");
+    const classIdHidden = document.getElementById("classIdHidden");
+    const subjectIdHidden = document.getElementById("subjectIdHidden");
+
+    // 1. Class change → Load subjects
+    classSelect.addEventListener("change", function () {
+      const classId = this.value;
+      if (!classId) {
+        subjectSelect.innerHTML =
+          '<option value="">Select Class first...</option>';
+        subjectSelect.disabled = true;
+        studentsSection.style.display = "none";
+        submitSection.style.display = "none";
+        return;
+      }
+
+      subjectSelect.disabled = true;
+      subjectSelect.innerHTML = '<option value="">Loading subjects...</option>';
+
+      fetch(`/teacher/get_subjects/${classId}`)
+        .then((response) => response.json())
+        .then((data) => {
+          subjectSelect.innerHTML =
+            '<option value="">Select Subject...</option>';
+          data.subjects.forEach((subject) => {
+            subjectSelect.innerHTML += `<option value="${subject.id}">${subject.subject_name}</option>`;
+          });
+          subjectSelect.disabled = false;
+          studentsSection.style.display = "none";
+          submitSection.style.display = "none";
+        })
+        .catch((error) => {
+          console.error("Error:", error);
+          subjectSelect.innerHTML =
+            '<option value="">Error loading subjects</option>';
+        });
+    });
+
+    // 2. Subject change → Load students
+    subjectSelect.addEventListener("change", function () {
+      const classId = classSelect.value;
+      const subjectId = this.value;
+
+      if (!classId || !subjectId) {
+        studentsSection.style.display = "none";
+        submitSection.style.display = "none";
+        return;
+      }
+
+      studentsTableBody.innerHTML =
+        '<tr><td colspan="2" class="text-center"><div class="spinner-border" role="status"></div> Loading students...</td></tr>';
+      classIdHidden.value = classId;
+      subjectIdHidden.value = subjectId;
+
+      fetch(`/teacher/get_students/${classId}`)
+        .then((response) => response.json())
+        .then((data) => {
+          studentsTableBody.innerHTML = "";
+          if (data.students.length === 0) {
+            studentsTableBody.innerHTML =
+              '<tr><td colspan="2" class="text-center text-warning">No students in this class</td></tr>';
+          } else {
+            data.students.forEach((student) => {
+              studentsTableBody.innerHTML += `
+                            <tr>
+                                <td><strong>${student.name}</strong></td>
+                                <td>
+                                    <select class="form-select form-select-sm" name="status_${student.id}" required>
+                                        <option value="">Select</option>
+                                        <option value="Present">✅ Present</option>
+                                        <option value="Absent">❌ Absent</option>
+                                    </select>
+                                </td>
+                            </tr>
+                        `;
+            });
+          }
+          studentsSection.style.display = "block";
+          submitSection.style.display = "block";
+          submitBtn.disabled = false;
+        })
+        .catch((error) => {
+          console.error("Error:", error);
+          studentsTableBody.innerHTML =
+            '<tr><td colspan="2" class="text-center text-danger">Error loading students</td></tr>';
+        });
+    });
+  });
+</script>
+
+<style>
+  .spinner-border {
+    width: 2rem;
+    height: 2rem;
+  }
+  .table th {
+    background-color: #0d6efd;
+    color: white;
+  }
+  @media (max-width: 768px) {
+    .table-responsive {
+      font-size: 0.9rem;
+    }
+  }
+</style>
 
 {% endblock %}

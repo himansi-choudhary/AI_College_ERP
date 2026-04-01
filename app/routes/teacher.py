@@ -138,6 +138,28 @@ def create_test():
         classes=classes
     )
 
+@teacher_bp.route('/get_classes')
+@login_required('teacher')
+def get_classes():
+    teacher_id = session.get('user_id')
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    cursor.execute("""
+        SELECT DISTINCT c.id, c.class_name
+        FROM teacher_subjects ts
+        JOIN classes c ON ts.class_id = c.id
+        WHERE ts.teacher_id = %s
+        ORDER BY c.class_name
+    """, (teacher_id,))
+    
+    classes = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    
+    return {'classes': classes}
+
 @teacher_bp.route('/get_subjects/<int:class_id>')
 @login_required('teacher')
 def get_subjects(class_id):
@@ -159,6 +181,26 @@ def get_subjects(class_id):
     conn.close()
     
     return {'subjects': subjects}
+
+@teacher_bp.route('/get_students/<int:class_id>')
+@login_required('teacher')
+def get_students(class_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    cursor.execute("""
+        SELECT u.id, u.name
+        FROM student_classes sc
+        JOIN users u ON sc.student_id = u.id
+        WHERE sc.class_id = %s
+        ORDER BY u.name
+    """, (class_id,))
+    
+    students = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    
+    return {'students': students}
 
 # ---------------- TEACHER ADD QUESTIONS ----------------
 @teacher_bp.route('/add_questions/<int:test_id>', methods=['GET','POST'])
@@ -335,72 +377,67 @@ def teacher_my_students():
 @teacher_bp.route('/attendance', methods=['GET', 'POST'])
 @login_required('teacher')
 def mark_attendance():
-    
-
     teacher_id = session.get('user_id')
     today = date.today()
 
-    conn = get_db_connection()
-
-    # Use a dictionary cursor for fetching mapping
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("""
-        SELECT ts.subject_id, ts.class_id, s.subject_name, c.class_name
-        FROM teacher_subjects ts
-        JOIN subjects s ON ts.subject_id = s.id
-        JOIN classes c ON ts.class_id = c.id
-        WHERE ts.teacher_id = %s
-    """, (teacher_id,))
-
-    mapping = cursor.fetchone()
-    while cursor.nextset():
-        pass
-    cursor.close()  
-
-    if not mapping:
-        conn.close()
-        flash("No subject assigned", "error")
-        return redirect('/teacher/dashboard')
-
-    # Use a **new cursor** for fetching students
-    student_cursor = conn.cursor(dictionary=True)
-    student_cursor.execute("""
-        SELECT u.id, u.name
-        FROM student_classes sc
-        JOIN users u ON sc.student_id = u.id
-        WHERE sc.class_id = %s
-    """, (mapping['class_id'],))
-    students = student_cursor.fetchall()
-    while student_cursor.nextset():
-        pass
-    student_cursor.close()
-
     if request.method == 'POST':
-        # Separate cursor for inserting attendance
+        class_id = request.form.get('class_id')
+        subject_id = request.form.get('subject_id')
+        
+        if not class_id or not subject_id:
+            flash("Please select class and subject", "error")
+            return render_template('teacher/mark_attendance.html', today=today)
+        
+        # Get students for selected class
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT u.id, u.name
+            FROM student_classes sc
+            JOIN users u ON sc.student_id = u.id
+            WHERE sc.class_id = %s
+            ORDER BY u.name
+        """, (class_id,))
+        students = cursor.fetchall()
+        
+        # Insert attendance
         insert_cursor = conn.cursor()
         for student in students:
             status = request.form.get(f"status_{student['id']}")
-            if status not in ['Present', 'Absent']:
-                continue
-            insert_cursor.execute("""
-                INSERT INTO attendance (student_id, subject_id, date, status)
-                VALUES (%s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE status=%s
-            """, (student['id'], mapping['subject_id'], today, status, status))
+            if status in ['Present', 'Absent']:
+                insert_cursor.execute("""
+                    INSERT INTO attendance (student_id, subject_id, date, status)
+                    VALUES (%s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE status = %s
+                """, (student['id'], subject_id, today, status, status))
         
         conn.commit()
-        while insert_cursor.nextset():
-            pass
+        cursor.close()
         insert_cursor.close()
         conn.close()
-        flash("Attendance saved successfully", "success")
+        flash("Attendance marked successfully!", "success")
         return redirect('/teacher/attendance')
 
-    # GET request: render attendance form
+    # GET: Load teacher's classes
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT DISTINCT c.id, c.class_name
+        FROM teacher_subjects ts
+        JOIN classes c ON ts.class_id = c.id
+        WHERE ts.teacher_id = %s
+        ORDER BY c.class_name
+    """, (teacher_id,))
+    classes = cursor.fetchall()
+    cursor.close()
     conn.close()
+    
+    if not classes:
+        flash("No classes assigned to you", "error")
+        return redirect('/teacher/dashboard')
+
     return render_template(
         'teacher/mark_attendance.html',
-        students=students,
-        subject=mapping,
+        classes=classes,
         today=today
     )
