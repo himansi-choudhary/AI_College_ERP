@@ -1,25 +1,173 @@
-{% extends 'base.html' %}
+{% extends 'base.html' %} {% block content %}
+<div class="container mt-4">
+  <h2>Create New Test</h2>
+  <p class="text-muted mb-4">
+    Select your assigned class and subject to create test for specific students.
+  </p>
 
-{% block content %}
+  {% with messages = get_flashed_messages(with_categories=true) %} {% if
+  messages %} {% for category, message in messages %}
+  <div
+    class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show"
+    role="alert"
+  >
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %} {% endif %} {% endwith %}
 
-<h2>Create Test</h2>
+  <form method="POST" id="createTestForm">
+    <div class="mb-4">
+      <label for="title" class="form-label fw-bold">Test Title</label>
+      <input
+        type="text"
+        class="form-control form-control-lg"
+        id="title"
+        name="title"
+        placeholder="e.g. Unit Test 1 - Mathematics"
+        required
+      />
+    </div>
 
-<form method="POST">
+    <div class="row">
+      <div class="col-md-6 mb-4">
+        <label for="class_id" class="form-label fw-bold"
+          >Class <span class="text-danger">*</span></label
+        >
+        <select
+          class="form-select form-select-lg"
+          id="class_id"
+          name="class_id"
+          required
+        >
+          <option value="">Select your assigned class...</option>
+          {% for cls in classes %}
+          <option value="{{ cls.id }}">{{ cls.class_name }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">Only shows classes assigned to you</div>
+      </div>
 
-Test Title<br>
-<input type="text" name="title"><br><br>
+      <div class="col-md-6 mb-4">
+        <label for="subject_id" class="form-label fw-bold"
+          >Subject <span class="text-danger">*</span></label
+        >
+        <select
+          class="form-select form-select-lg"
+          id="subject_id"
+          name="subject_id"
+          disabled
+        >
+          <option value="">First select class above</option>
+        </select>
+        <div class="form-text">
+          Only shows subjects assigned to you for selected class
+        </div>
+      </div>
+    </div>
 
-Subject<br>
-<select name="subject_id">
+    <div class="d-grid">
+      <button
+        type="submit"
+        class="btn btn-primary btn-lg"
+        id="nextBtn"
+        disabled
+      >
+        <i class="fas fa-arrow-right me-2"></i>Next → Add MCQ Questions
+      </button>
+    </div>
+  </form>
+</div>
 
-{% for s in subjects %}
-<option value="{{ s.id }}">{{ s.subject_name }}</option>
-{% endfor %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const classSelect = document.getElementById("class_id");
+    const subjectSelect = document.getElementById("subject_id");
+    const titleInput = document.getElementById("title");
+    const nextBtn = document.getElementById("nextBtn");
+    const form = document.getElementById("createTestForm");
 
-</select><br><br>
+    // Validate form before submit
+    form.addEventListener("submit", function (e) {
+      if (
+        !titleInput.value.trim() ||
+        !classSelect.value ||
+        !subjectSelect.value
+      ) {
+        e.preventDefault();
+        alert("Please fill all required fields");
+        return false;
+      }
+    });
 
-<button type="submit">Create Test</button>
+    // Enable/disable Next button
+    function checkFormValid() {
+      const valid =
+        titleInput.value.trim() && classSelect.value && subjectSelect.value;
+      nextBtn.disabled = !valid;
+      nextBtn.classList.toggle("btn-secondary", !valid);
+      nextBtn.classList.toggle("btn-primary", valid);
+    }
 
-</form>
+    titleInput.addEventListener("input", checkFormValid);
+    classSelect.addEventListener("change", checkFormValid);
+    subjectSelect.addEventListener("change", checkFormValid);
 
+    // Dynamic subject loading
+    classSelect.addEventListener("change", function () {
+      const classId = this.value;
+
+      if (classId) {
+        subjectSelect.disabled = true;
+        subjectSelect.innerHTML =
+          '<option value="">Loading subjects...</option>';
+        nextBtn.disabled = true;
+
+        fetch(`/teacher/get_subjects/${classId}`)
+          .then((response) => response.json())
+          .then((data) => {
+            subjectSelect.innerHTML =
+              '<option value="">Choose subject...</option>';
+            if (data.subjects && data.subjects.length > 0) {
+              data.subjects.forEach((subject) => {
+                const option = new Option(subject.subject_name, subject.id);
+                subjectSelect.add(option);
+              });
+            } else {
+              subjectSelect.innerHTML =
+                '<option value="">No subjects assigned for this class</option>';
+            }
+            subjectSelect.disabled = false;
+            checkFormValid();
+          })
+          .catch((error) => {
+            console.error("Error loading subjects:", error);
+            subjectSelect.innerHTML =
+              '<option value="">Error loading subjects</option>';
+            subjectSelect.disabled = false;
+          });
+      } else {
+        subjectSelect.innerHTML =
+          '<option value="">First select class</option>';
+        subjectSelect.disabled = true;
+        checkFormValid();
+      }
+    });
+  });
+</script>
+
+<style>
+  .text-danger {
+    color: #dc3545 !important;
+  }
+  .form-text {
+    font-size: 0.875em;
+    color: #6c757d;
+  }
+  .fas {
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+  }
+</style>
 {% endblock %}

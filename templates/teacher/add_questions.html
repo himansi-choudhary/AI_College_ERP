@@ -1,39 +1,62 @@
-{% extends 'base.html' %}
+{% extends 'base.html' %} {% block content %}
+<div class="container mt-4">
+  <h2>Add Questions to Test #{{ test_id }}</h2>
+  <p class="text-muted">
+    Add multiple MCQ questions. Click "Finish Test" when done.
+  </p>
 
-{% block content %}
+  <form method="POST" class="mb-4">
+    <div class="row">
+      <div class="col-md-12 mb-3">
+        <label for="question" class="form-label">Question</label>
+        <input
+          type="text"
+          class="form-control"
+          id="question"
+          name="question"
+          required
+        />
+      </div>
 
-<h2>Add Question</h2>
+      <div class="col-md-6 mb-3">
+        <label class="form-label">Option A</label>
+        <input type="text" class="form-control" name="a" required />
+      </div>
+      <div class="col-md-6 mb-3">
+        <label class="form-label">Option B</label>
+        <input type="text" class="form-control" name="b" required />
+      </div>
 
-<form method="POST">
+      <div class="col-md-6 mb-3">
+        <label class="form-label">Option C</label>
+        <input type="text" class="form-control" name="c" required />
+      </div>
+      <div class="col-md-6 mb-3">
+        <label class="form-label">Option D</label>
+        <input type="text" class="form-control" name="d" required />
+      </div>
 
-Question<br>
-<input type="text" name="question"><br><br>
+      <div class="col-md-12 mb-3">
+        <label for="correct" class="form-label">Correct Answer</label>
+        <select class="form-select" id="correct" name="correct" required>
+          <option value="">Select correct option</option>
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+          <option value="D">D</option>
+        </select>
+      </div>
+    </div>
 
-Option A<br>
-<input type="text" name="a"><br>
+    <button type="submit" class="btn btn-success me-2">➕ Add Question</button>
+    <a href="/teacher/dashboard" class="btn btn-primary"
+      >✅ Finish Test & Return to Dashboard</a
+    >
+  </form>
 
-Option B<br>
-<input type="text" name="b"><br>
-
-Option C<br>
-<input type="text" name="c"><br>
-
-Option D<br>
-<input type="text" name="d"><br><br>
-
-Correct Option<br>
-
-<select name="correct">
-
-<option value="A">A</option>
-<option value="B">B</option>
-<option value="C">C</option>
-<option value="D">D</option>
-
-</select><br><br>
-
-<button type="submit">Add Question</button>
-
-</form>
-
+  <div class="alert alert-info">
+    <strong>Tip:</strong> Add as many questions as needed, then click "Finish
+    Test" when complete.
+  </div>
+</div>
 {% endblock %}

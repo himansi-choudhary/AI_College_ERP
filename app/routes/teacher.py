@@ -104,27 +104,61 @@ def create_test():
     cursor = conn.cursor(dictionary=True)
 
     if request.method == 'POST':
-
         title = request.form['title']
+        class_id = request.form['class_id']
         subject_id = request.form['subject_id']
 
         cursor.execute("""
-        INSERT INTO tests (title, subject_id, teacher_id)
-        VALUES (%s,%s,%s)
-        """,(title,subject_id,teacher_id))
-
+            INSERT INTO tests (title, class_id, subject_id, teacher_id)
+            VALUES (%s, %s, %s, %s)
+        """, (title, class_id, subject_id, teacher_id))
+        
+        test_id = cursor.lastrowid
         conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return redirect(f'/teacher/add_questions/{test_id}')
 
-    cursor.execute("SELECT id, subject_name FROM subjects")
-    subjects = cursor.fetchall()
-
+    # Get teacher's assigned classes
+    cursor.execute("""
+        SELECT DISTINCT c.id, c.class_name 
+        FROM teacher_subjects ts
+        JOIN classes c ON ts.class_id = c.id
+        WHERE ts.teacher_id = %s
+        ORDER BY c.class_name
+    """, (teacher_id,))
+    
+    classes = cursor.fetchall()
     cursor.close()
     conn.close()
 
     return render_template(
         'teacher/create_test.html',
-        subjects=subjects
+        classes=classes
     )
+
+@teacher_bp.route('/get_subjects/<int:class_id>')
+@login_required('teacher')
+def get_subjects(class_id):
+    teacher_id = session.get('user_id')
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    cursor.execute("""
+        SELECT s.id, s.subject_name
+        FROM teacher_subjects ts
+        JOIN subjects s ON ts.subject_id = s.id
+        WHERE ts.teacher_id = %s AND ts.class_id = %s
+        ORDER BY s.subject_name
+    """, (teacher_id, class_id))
+    
+    subjects = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    
+    return {'subjects': subjects}
 
 # ---------------- TEACHER ADD QUESTIONS ----------------
 @teacher_bp.route('/add_questions/<int:test_id>', methods=['GET','POST'])
